@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f3a2b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>わな猟日誌（京都府）</title>
+<style>
+:root{
+  --bg:#f3f1ea; --card:#fff; --ink:#1d241f; --sub:#5d665f; --line:#d9d6cc;
+  --green:#1f3a2b; --green2:#2f5d43; --orange:#c8611d; --red:#b3261e; --blue:#2a5b8a; --yellow:#f2c94c;
+  --r:14px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--green);color:#fff;padding:10px 14px calc(10px) 14px;padding-top:max(10px,env(safe-area-inset-top));display:flex;align-items:center;gap:10px}
+header h1{font-size:17px;margin:0;flex:1;font-weight:700;letter-spacing:.02em}
+header .me{font-size:13px;opacity:.85}
+.badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;font-size:13px;background:rgba(255,255,255,.15);border:0;color:#fff}
+.badge.warn{background:var(--yellow);color:#3a2a00}
+.badge.err{background:#ffd9d6;color:var(--red)}
+main{padding:12px 12px 120px;max-width:640px;margin:0 auto}
+.card{background:var(--card);border-radius:var(--r);padding:14px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.06);border:1px solid var(--line)}
+.loc{display:flex;gap:12px;align-items:center}
+.mesh{min-width:96px;text-align:center;background:var(--green);color:#fff;border-radius:12px;padding:8px 6px}
+.mesh .n{font-size:34px;font-weight:800;line-height:1.1;letter-spacing:.04em}
+.mesh .l{font-size:11px;opacity:.85}
+.loc .place{flex:1;min-width:0}
+.loc .place .p1{font-size:18px;font-weight:700}
+.loc .place .p2{font-size:13px;color:var(--sub)}
+.iconbtn{border:1px solid var(--line);background:#fff;border-radius:12px;padding:10px 12px;font-size:14px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px}
+.act{border:0;border-radius:var(--r);padding:16px 10px;font-size:18px;font-weight:700;color:#fff;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:76px}
+.act small{font-size:12px;font-weight:400;opacity:.9}
+.a-set{background:var(--green2)} .a-check{background:var(--blue)} .a-catch{background:var(--orange)} .a-remove{background:#6b6b6b} .a-note{background:#7a5a2f;grid-column:span 2;min-height:56px;flex-direction:row;justify-content:center;gap:10px}
+h2{font-size:15px;margin:18px 4px 8px;color:var(--sub);font-weight:700;display:flex;justify-content:space-between;align-items:center}
+.trap{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line)}
+.trap:last-child{border-bottom:0}
+.trap .id{font-weight:800;font-size:17px;min-width:76px}
+.trap .info{flex:1;min-width:0;font-size:13px;color:var(--sub)}
+.trap .info b{color:var(--ink);font-weight:600}
+.tag{display:inline-block;font-size:11px;border-radius:6px;padding:1px 6px;margin-right:4px;background:#eee;color:#333}
+.tag.k{background:#fde7d6;color:#7a3a0c}.tag.h{background:#fff3c4;color:#6a5200}.tag.f{background:#d8f0ea;color:#1d5a4c}
+.tag.pending{background:#e6eefc;color:var(--blue)}
+.days{font-size:13px;font-weight:700;padding:3px 8px;border-radius:8px;background:#e9f3ec;color:var(--green2);white-space:nowrap}
+.days.late{background:#ffe1de;color:var(--red)}
+.empty{color:var(--sub);font-size:14px;padding:6px 4px}
+.log{font-size:13px;padding:8px 4px;border-bottom:1px solid var(--line);display:flex;gap:8px}
+.log .t{color:var(--sub);min-width:84px}
+.deer .bar{height:10px;background:#eee;border-radius:6px;overflow:hidden;margin:8px 0}
+.deer .bar i{display:block;height:100%;background:var(--orange)}
+.small{font-size:12px;color:var(--sub)}
+.alert{background:#fff6d8;border:1px solid #f0d77a;color:#5a4500;border-radius:12px;padding:10px 12px;font-size:14px;margin-bottom:12px}
+.alert.red{background:#ffe9e7;border-color:#f3b4ad;color:#7a1a12}
+/* sheet */
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:20;display:none}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;background:var(--bg);border-radius:18px 18px 0 0;max-height:92vh;overflow:auto;transform:translateY(100%);transition:transform .2s ease;padding:0 0 calc(16px + env(safe-area-inset-bottom))}
+.sheet.open{transform:none}
+.sheet:not(.open){visibility:hidden;transition:transform .2s ease,visibility 0s .2s}
+.sheet-bg.open{display:block}
+.sheet .hd{position:sticky;top:0;background:var(--bg);padding:14px 16px 8px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);z-index:2}
+.sheet .hd h3{margin:0;font-size:18px;flex:1}
+.sheet .bd{padding:12px 16px;max-width:640px;margin:0 auto}
+label.f{display:block;font-size:13px;color:var(--sub);margin:14px 0 6px;font-weight:600}
+input[type=text],input[type=number],input[type=date],input[type=time],select,textarea{width:100%;font-size:17px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--ink)}
+textarea{min-height:72px;resize:vertical}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:9px 14px;font-size:15px}
+.chip.on{background:var(--green2);border-color:var(--green2);color:#fff}
+.row{display:flex;gap:10px}.row>*{flex:1}
+.stepper{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:4px}
+.stepper button{width:40px;height:44px;border-radius:10px;border:0;background:#eee;font-size:22px}
+.stepper span{flex:1;text-align:center;font-size:22px;font-weight:800}
+.stepper-l{font-size:13px;color:var(--sub);text-align:center;margin-bottom:4px}
+.btn{width:100%;border:0;border-radius:var(--r);padding:16px;font-size:18px;font-weight:800;background:var(--green);color:#fff;margin-top:18px}
+.btn.sec{background:#fff;color:var(--ink);border:1px solid var(--line);font-weight:600;font-size:16px;padding:13px}
+.btn:disabled{opacity:.5}
+.checkrow{display:flex;align-items:center;gap:10px;padding:10px;background:#fff;border:1px solid var(--line);border-radius:12px;margin-bottom:8px}
+.checkrow input{width:24px;height:24px}
+.checkrow .nm{font-weight:800;min-width:70px}
+.checkrow select{font-size:15px;padding:8px;flex:1}
+.photos{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.photos img{width:84px;height:84px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+.hint{font-size:13px;background:#eef4ee;border-radius:10px;padding:10px 12px;color:#26412f;margin-top:8px}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#222;color:#fff;padding:12px 18px;border-radius:12px;z-index:40;font-size:15px;display:none;max-width:90vw}
+.fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:6}
+.mini{font-size:12px;color:var(--sub);margin-top:4px}
+a{color:var(--blue)}
+</style>
+</head>
+<body>
+<header>
+  <h1>わな猟日誌 <span class="me" id="meName"></span></h1>
+  <button class="badge" id="syncBadge" onclick="App.sync(true)">…</button>
+  <button class="badge" onclick="App.openSettings()" aria-label="設定">⚙</button>
+</header>
+<main id="main"></main>
+<div class="sheet-bg" id="sheetBg" onclick="App.closeSheet()"></div>
+<div class="sheet" id="sheet"><div class="hd"><h3 id="sheetTitle"></h3><button class="iconbtn" onclick="App.closeSheet()">閉じる</button></div><div class="bd" id="sheetBody"></div></div>
+<div class="toast" id="toast"></div>
+<input type="file" id="fileIn" accept="image/*" capture="environment" style="display:none">
+
+<script>
+'use strict';
+// ================= 位置図番号（京都府鳥獣保護区等位置図 令和8年度） =================
+// 行=floor(緯度×24)、列=floor(経度×16)。北の行から順に西→東へ001〜242。
+const MESH_ROWS=[[858,[62,63,64]],[857,[61,62,63,64,66,67]],[856,[59,60,61,62,63,64,66,67]],[855,[57,58,59,60,61,62,63,64,66]],[854,[57,58,59,60,61,62,63,64,67]],[853,[57,58,59,60,61,62,63,64,65,66,67]],[852,[58,59,60,61,62,63,64,65,66,67]],[851,[60,61,62,63,64,65,66,67]],[850,[60,61,62,63,64,65,66,67,68]],[849,[58,59,60,61,62,63,64,65,66,67,68]],[848,[58,59,60,61,62,63,64,65,66,67,68,69,70,71,72]],[847,[58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73]],[846,[59,60,61,62,63,64,65,66,67,68,69,70,71,72,73]],[845,[61,62,63,64,65,66,67,68,69,70,71,72,73]],[844,[63,64,65,66,67,68,69,70,71,72,73]],[843,[63,64,65,66,67,68,69,70,71,72,73]],[842,[66,67,68,69,70,71,72,73]],[841,[65,66,67,68,69,70,71,72,73]],[840,[66,67,68,69,70,71,72,73]],[839,[66,67,68,69,70,71,72,73]],[838,[67,68,69,70,71,72,73,74]],[837,[68,69,70,71,72,73,74,75]],[836,[70,71,72,73,74,75,76]],[835,[71,72,73,74,75,76]],[834,[71,72,73,74,75,76]],[833,[71,72,73,74,75,76]],[832,[73,74,75]]];
+const MESH_INDEX=(()=>{const m={};let n=1;for(const [r,cols] of MESH_ROWS)for(const c of cols)m[r+'_'+(c+2100)]=n++;return m})();
+function meshOf(lat,lon){const n=MESH_INDEX[Math.floor(lat*24)+'_'+Math.floor(lon*16)];return n?String(n).padStart(3,'0'):''}
+// 区画の境界までの距離（m）… 境界近くは番号が隣とずれる可能性を表示
+function edgeDist(lat,lon){const y=lat*24,x=lon*16;const dy=Math.min(y-Math.floor(y),Math.ceil(y)-y)/24*111000;const dx=Math.min(x-Math.floor(x),Math.ceil(x)-x)/16*111000*Math.cos(lat*Math.PI/180);return Math.min(dx,dy)}
+const MUNI={'26101':'京都市北区','26102':'京都市上京区','26103':'京都市左京区','26104':'京都市中京区','26105':'京都市東山区','26106':'京都市下京区','26107':'京都市南区','26108':'京都市右京区','26109':'京都市伏見区','26110':'京都市山科区','26111':'京都市西京区','26201':'福知山市','26202':'舞鶴市','26203':'綾部市','26204':'宇治市','26205':'宮津市','26206':'亀岡市','26207':'城陽市','26208':'向日市','26209':'長岡京市','26210':'八幡市','26211':'京田辺市','26212':'京丹後市','26213':'南丹市','26214':'木津川市','26303':'大山崎町','26322':'久御山町','26343':'井手町','26344':'宇治田原町','26364':'笠置町','26365':'和束町','26366':'精華町','26367':'南山城村','26407':'京丹波町','26463':'伊根町','26465':'与謝野町'};
+
+// ================= 小物 =================
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const today=()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
+const nowTime=()=>{const d=new Date();return `${pad(d.getHours())}:${pad(d.getMinutes())}`};
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const daysBetween=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000);
+const md=s=>s?`${+s.slice(5,7)}/${+s.slice(8,10)}`:'';
+function toast(msg,ms=2600){const t=$('#toast');t.textContent=msg;t.style.display='block';clearTimeout(toast._t);toast._t=setTimeout(()=>t.style.display='none',ms)}
+const LS={get:(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+
+// ================= IndexedDB（未送信キュー・写真） =================
+const DB={
+  db:null,
+  open(){return new Promise((res,rej)=>{if(this.db)return res(this.db);const r=indexedDB.open('wanalog',1);r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('queue',{keyPath:'id'});};r.onsuccess=()=>{this.db=r.result;res(this.db)};r.onerror=()=>rej(r.error)})},
+  async tx(mode,fn){const d=await this.open();return new Promise((res,rej)=>{const t=d.transaction('queue',mode);const s=t.objectStore('queue');const out=fn(s);t.oncomplete=()=>res(out&&out.result!==undefined?out.result:out);t.onerror=()=>rej(t.error)})},
+  put(ev){return this.tx('readwrite',s=>s.put(ev))},
+  del(id){return this.tx('readwrite',s=>s.delete(id))},
+  async all(){const d=await this.open();return new Promise((res,rej)=>{const r=d.transaction('queue').objectStore('queue').getAll();r.onsuccess=()=>res((r.result||[]).sort((a,b)=>a.seq-b.seq));r.onerror=()=>rej(r.error)})}
+};
+
+// ================= 定数 =================
+const TRAP_TYPES=[{v:'くくりわな',l:'K',c:'k'},{v:'箱わな',l:'H',c:'h'},{v:'囲いわな',l:'F',c:'f'}];
+const SPECIES=['ニホンジカ','イノシシ','アナグマ','アライグマ','ハクビシン','タヌキ','キツネ','ヌートリア','ノウサギ','その他'];
+const DISPOSAL=['食肉加工施設','自家消費','埋設','保管庫'];
+const CHECK_RESULTS=['異常なし','空はじき','掛け直し','破損・要修理','錯誤捕獲（放獣）'];
+const WEATHERS=['晴れ','曇り','雨','雪','霧'];
+const TYPE_JA={set:'設置',check:'見回り',catch:'捕獲',remove:'撤去',note:'メモ'};
+const typeCls=t=>(TRAP_TYPES.find(x=>t&&t.indexOf(x.v.slice(0,2))===0)||{c:''}).c;
+
+// ================= アプリ本体 =================
+const App={
+  cfg:LS.get('cfg',{api:'',token:''}),
+  state:LS.get('state',null),
+  history:LS.get('history',[]),
+  queue:[],
+  loc:null, place:LS.get('lastPlace',null), weather:null,
+  syncing:false, lastErr:'',
+  form:{},
+
+  async init(){
+    // 招待リンク (?api=...&token=...)
+    const q=new URLSearchParams(location.search);
+    if(q.get('api')&&q.get('token')){this.cfg={api:q.get('api'),token:q.get('token')};LS.set('cfg',this.cfg);history.replaceState(null,'',location.pathname);toast('設定を読み込みました')}
+    this.queue=await DB.all();
+    this.render();
+    if(!this.cfg.api||!this.cfg.token){this.openSettings();}
+    this.locate();
+    this.sync();
+    window.addEventListener('online',()=>this.sync());
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden){this.sync();if(!this.loc||Date.now()-this.loc.time>120000)this.locate()}});
+    if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
+  },
+
+  me(){return this.state?.me?.name||this.cfg.name||''},
+  prefix(){return this.state?.me?.prefix||(this.me()||'?').charAt(0)},
+  settings(){return this.state?.settings||{seasonStart:'2026-11-15',seasonEnd:'2027-03-15',otherEnd:'2027-02-15',deerEnd:'2027-02-28',deerReport:'2027-03-04',checkWarnDays:1,group:''}},
+
+  // サーバーの罠一覧 + 未送信イベントを反映した見かけの罠一覧
+  traps(){
+    const m=new Map();
+    for(const t of (this.state?.traps||[]))m.set(t.id,{...t});
+    for(const q of this.queue){const e=q.ev;
+      if(e.type==='set'){m.set(e.trapId,{id:e.trapId,type:e.trapType,owner:e.owner||this.me(),status:'稼働中',setDate:e.date,mesh:e.mesh,city:e.city,oaza:e.oaza,lat:e.lat,lon:e.lon,memo:e.memo,lastCheck:e.date,catches:0,pending:true})}
+      else if(m.has(e.trapId)){const t=m.get(e.trapId);
+        if(e.type==='check'||e.type==='catch'){if(!t.lastCheck||e.date>t.lastCheck)t.lastCheck=e.date;t.pending=true}
+        if(e.type==='catch')t.catches=(+t.catches||0)+(+e.male||0)+(+e.female||0)+(+e.unknown||0);
+        if(e.type==='remove'){t.status='撤去済';t.removeDate=e.date;t.pending=true}
+      }}
+    return [...m.values()];
+  },
+  activeTraps(){return this.traps().filter(t=>t.status==='稼働中').sort((a,b)=>(a.owner===this.me()?0:1)-(b.owner===this.me()?0:1)||a.id.localeCompare(b.id,'ja'))},
+
+  // ---------- 位置 ----------
+  locate(){
+    if(!navigator.geolocation){this.loc=null;this.render();return}
+    this.locating=true;this.render();
+    navigator.geolocation.getCurrentPosition(p=>{
+      this.locating=false;
+      this.loc={lat:+p.coords.latitude.toFixed(6),lon:+p.coords.longitude.toFixed(6),acc:Math.round(p.coords.accuracy),time:Date.now()};
+      this.loc.mesh=meshOf(this.loc.lat,this.loc.lon);
+      this.render();this.reverse();this.fetchWeather();
+      if(this.form.useLoc)this.renderForm();
+    },err=>{this.locating=false;this.locErr=err.code===1?'位置情報が許可されていません':'位置を取得できません';this.render()},{enableHighAccuracy:true,timeout:25000,maximumAge:20000});
+  },
+  async reverse(){
+    const l=this.loc;if(!l||!navigator.onLine)return;
+    try{const r=await fetch(`https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress?lat=${l.lat}&lon=${l.lon}`);const j=await r.json();
+      if(j&&j.results){const cd=String(j.results.muniCd||'');this.place={lat:l.lat,lon:l.lon,city:MUNI[cd]||(cd.startsWith('26')?'':'京都府外'),oaza:(j.results.lv01Nm||'').replace(/^－$/,'')};LS.set('lastPlace',this.place);this.render();if(this.form.useLoc)this.renderForm()}}catch(e){}
+  },
+  placeNow(){const l=this.loc,p=this.place;if(l&&p&&Math.abs(p.lat-l.lat)<0.002&&Math.abs(p.lon-l.lon)<0.002)return p;return null},
+  async fetchWeather(){
+    const l=this.loc;if(!l||!navigator.onLine)return;
+    try{const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${l.lat}&longitude=${l.lon}&current=temperature_2m,weather_code&timezone=Asia%2FTokyo`);const j=await r.json();
+      const c=j.current;if(!c)return;const w=c.weather_code;
+      this.weather={temp:Math.round(c.temperature_2m),w:w<=1?'晴れ':w<=3?'曇り':(w===45||w===48)?'霧':(w>=71&&w<=77)||w===85||w===86?'雪':'雨'};
+    }catch(e){}
+  },
+
+  // ---------- 描画 ----------
+  render(){
+    $('#meName').textContent=this.me()?'・'+this.me():'';
+    const b=$('#syncBadge');const n=this.queue.length;
+    b.className='badge'+(this.lastErr?' err':n?' warn':'');
+    b.textContent=this.syncing?'送信中…':this.lastErr?'⚠ 未送信'+n:n?'未送信 '+n:'✓ 同期済';
+    const s=this.settings(),t=today();
+    let h='';
+    // 警告
+    if(!this.cfg.api||!this.cfg.token)h+=`<div class="alert red">サーバーの設定がまだです。右上の⚙から設定するか、招待リンクを開いてください。</div>`;
+    if(t<s.seasonStart||t>s.seasonEnd)h+=`<div class="alert">今日は猟期外です（猟期 ${md(s.seasonStart)}〜${md(s.seasonEnd)}）。</div>`;
+    else if(t>s.otherEnd)h+=`<div class="alert">シカ・イノシシ以外の猟期は ${md(s.otherEnd)} で終了しています。</div>`;
+    const late=this.activeTraps().filter(x=>x.owner===this.me()&&x.lastCheck&&daysBetween(x.lastCheck,t)>s.checkWarnDays);
+    if(late.length)h+=`<div class="alert red">見回りが空いている罠：${late.map(x=>esc(x.id)).join('、')}</div>`;
+    // 位置
+    const l=this.loc,p=this.placeNow();
+    const meshTxt=l?(l.mesh||'府外'):'---';
+    const near=l&&l.mesh&&edgeDist(l.lat,l.lon)<Math.max(30,l.acc);
+    h+=`<div class="card"><div class="loc"><div class="mesh"><div class="l">位置図番号</div><div class="n">${esc(meshTxt)}</div></div>
+      <div class="place"><div class="p1">${p?esc((p.city||'')+(p.oaza||'')):(l?(navigator.onLine?'住所を取得中…':'住所は送信時に自動入力'):'')}${this.locating?'<span class="small"> 測位中…</span>':''}</div>
+      <div class="p2">${l?`精度 ±${l.acc}m・${new Date(l.time).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}`:esc(this.locErr||'位置を取得していません')}</div>
+      ${near?'<div class="p2" style="color:var(--orange)">区画の境界付近です。番号を確認してください</div>':''}</div>
+      <button class="iconbtn" onclick="App.locate()">現在地</button></div></div>`;
+    // ボタン
+    h+=`<div class="grid">
+      <button class="act a-set" onclick="App.formSet()">罠を設置<small>新しい罠・移設</small></button>
+      <button class="act a-check" onclick="App.formCheck()">見回り<small>まとめて記録</small></button>
+      <button class="act a-catch" onclick="App.formCatch()">捕獲<small>獲れた！</small></button>
+      <button class="act a-remove" onclick="App.formRemove()">撤去<small>罠を外した</small></button>
+      <button class="act a-note" onclick="App.formNote()">痕跡・メモ <small>足跡・ヌタ場・写真</small></button></div>`;
+    // 罠一覧
+    const traps=this.activeTraps();
+    h+=`<h2><span>稼働中の罠（${traps.length}基）</span><span class="small">自分 ${traps.filter(x=>x.owner===this.me()).length}基</span></h2><div class="card">`;
+    if(!traps.length)h+=`<div class="empty">稼働中の罠はありません。「罠を設置」から登録します。</div>`;
+    for(const x of traps){const d=x.lastCheck?daysBetween(x.lastCheck,t):null;
+      h+=`<div class="trap" onclick="App.trapMenu('${esc(x.id)}')"><div class="id">${esc(x.id)}</div>
+      <div class="info"><span class="tag ${typeCls(x.type)}">${esc(x.type)}</span>${x.pending?'<span class="tag pending">未送信</span>':''}<br><b>${esc(x.mesh||'---')}</b> ${esc((x.oaza||x.city||''))}・${esc(x.owner)}${+x.catches?`・捕獲${x.catches}`:''}</div>
+      <div class="days ${d!=null&&d>s.checkWarnDays?'late':''}">${d==null?'-':d===0?'今日':d+'日前'}</div></div>`}
+    h+=`</div>`;
+    // シカ事業
+    const deer=this.state?.deer;
+    if(deer){const pct=Math.min(100,deer.total/Math.max(deer.min,1)*100);
+      h+=`<h2><span>シカ捕獲強化事業（${esc(s.group||'班')}）</span></h2><div class="card deer">
+      <div><b style="font-size:22px">${deer.total}</b> 頭 <span class="small">（対象期間 〜${md(s.deerEnd)}・${deer.min}頭以上で支給）</span></div>
+      <div class="bar"><i style="width:${pct}%"></i></div>
+      <div class="small">${deer.eligible?`奨励金見込 ${deer.amount.toLocaleString()}円`:`あと ${deer.min-deer.total} 頭で支給対象`}・完了報告期限 ${md(s.deerReport)}</div>
+      ${t>s.deerEnd?'<div class="small" style="color:var(--red)">対象期間は終了しました（3/1以降の捕獲は対象外）</div>':''}</div>`}
+    // 履歴
+    const recent=[...this.queue.map(q=>({...q.ev,pending:true})).reverse(),...this.history].slice(0,15);
+    h+=`<h2><span>最近の記録</span></h2><div class="card">`;
+    if(!recent.length)h+=`<div class="empty">まだ記録がありません</div>`;
+    for(const e of recent){h+=`<div class="log"><div class="t">${md(e.date)} ${esc(e.time||'')}</div><div>${e.pending?'<span class="tag pending">未送信</span>':''}<b>${TYPE_JA[e.type]}</b> ${esc(e.trapId||'')} ${esc(e.species||'')}${e.type==='catch'?` ♂${e.male||0} ♀${e.female||0}${+e.unknown?' 不明'+e.unknown:''}`:''} ${esc(e.checkResult&&e.checkResult!=='異常なし'?e.checkResult:'')} <span class="small">${esc(e.mesh||'')}${e.byName&&e.byName!==this.me()?'・'+esc(e.byName):''}</span></div></div>`}
+    h+=`</div><p class="small" style="text-align:center">データはスプレッドシートに保存され、PCで編集できます。</p>`;
+    $('#main').innerHTML=h;
+  },
+
+  // ---------- シート（入力画面） ----------
+  openSheet(title,html){$('#sheetTitle').textContent=title;$('#sheetBody').innerHTML=html;$('#sheet').classList.add('open');$('#sheetBg').classList.add('open');$('#sheet').scrollTop=0},
+  closeSheet(){$('#sheet').classList.remove('open');$('#sheetBg').classList.remove('open');this.form={}},
+  renderForm(){if(this.form.render)this.form.render()},
+  chipHtml(name,opts,val){return `<div class="chips">${opts.map(o=>`<button type="button" class="chip ${o===val?'on':''}" onclick="App.setF('${name}','${esc(o)}')">${esc(o)}</button>`).join('')}</div>`},
+  setF(k,v){this.form[k]=this.form[k]===v&&this.form.toggle?.includes(k)?'':v;this.renderForm()},
+  readInputs(){$('#sheetBody').querySelectorAll('[data-f]').forEach(el=>{this.form[el.dataset.f]=el.type==='checkbox'?el.checked:el.value})},
+  locBlock(){
+    const l=this.loc,p=this.placeNow(),f=this.form;
+    const mesh=f.meshOverride||(l&&l.mesh)||'';
+    return `<label class="f">場所（GPS）</label><div class="card" style="margin:0"><div class="loc"><div class="mesh"><div class="l">位置図番号</div><div class="n">${esc(mesh||'---')}</div></div>
+      <div class="place"><div class="p1">${p?esc((p.city||'')+(p.oaza||'')):'住所は送信時に自動入力'}</div><div class="p2">${l?`±${l.acc}m`:'位置未取得'}${this.locating?' 測位中…':''}</div></div>
+      <button class="iconbtn" type="button" onclick="App.readInputs();App.locate()">再取得</button></div>
+      <div class="mini">番号を手で直す場合：<input type="text" inputmode="numeric" maxlength="3" style="width:90px;display:inline-block;padding:6px 8px;font-size:16px" data-f="meshOverride" value="${esc(f.meshOverride||'')}" placeholder="例 106"></div></div>`;
+  },
+  photoBlock(hint){return `<label class="f">写真（任意・何枚でも）</label>${hint?`<div class="hint">${hint}</div>`:''}<div class="photos">${(this.form.photos||[]).map((p,i)=>`<img src="${p.dataUrl}" onclick="App.delPhoto(${i})">`).join('')}<button type="button" class="iconbtn" style="width:84px;height:84px" onclick="App.addPhoto()">＋撮影</button></div>${(this.form.photos||[]).length?'<div class="mini">写真をタップで削除</div>':''}`},
+  addPhoto(){this.readInputs();const fi=$('#fileIn');fi.value='';fi.onchange=async()=>{const f=fi.files[0];if(!f)return;const dataUrl=await resizeImage(f,1600,.8);(this.form.photos=this.form.photos||[]).push({dataUrl});this.renderForm()};fi.click()},
+  delPhoto(i){if(confirm('この写真を削除しますか？')){this.readInputs();this.form.photos.splice(i,1);this.renderForm()}},
+  dateBlock(){return `<div class="row"><div><label class="f">日付</label><input type="date" data-f="date" value="${esc(this.form.date||today())}"></div><div><label class="f">時刻</label><input type="time" data-f="time" value="${esc(this.form.time||nowTime())}"></div></div>`},
+  weatherBlock(){const f=this.form;if(f.weather===undefined&&this.weather){f.weather=this.weather.w;f.temp=this.weather.temp}
+    return `<label class="f">天候・気温</label>${this.chipHtml('weather',WEATHERS,f.weather)}<div class="row" style="margin-top:8px"><input type="number" inputmode="numeric" data-f="temp" value="${esc(f.temp??'')}" placeholder="気温 ℃"></div>`},
+  baseEvent(type){const l=this.loc,p=this.placeNow(),f=this.form;
+    return {id:uid(),type,date:f.date||today(),time:f.time||nowTime(),lat:l?.lat||'',lon:l?.lon||'',acc:l?.acc||'',
+      mesh:(f.meshOverride||'').trim()||l?.mesh||'',city:p?.city||'',oaza:p?.oaza||'',weather:f.weather||'',temp:f.temp??'',memo:f.memo||'',byName:this.me()}},
+
+  // 罠を設置
+  nextId(type){const tt=TRAP_TYPES.find(x=>x.v===type)||TRAP_TYPES[0];const pre=this.prefix()+tt.l+'-';let max=0;for(const t of this.traps()){if(t.id.startsWith(pre)){const n=parseInt(t.id.slice(pre.length));if(n>max)max=n}}return pre+pad(max+1)},
+  formSet(){
+    this.form={useLoc:true,trapType:'くくりわな',owner:this.me(),render:()=>{const f=this.form;if(!f.idEdited)f.trapId=this.nextId(f.trapType);
+      this.openSheet('罠を設置',`
+      <label class="f">わなの種類</label>${this.chipHtml('trapType',TRAP_TYPES.map(x=>x.v),f.trapType)}
+      <div class="row"><div><label class="f">罠ID</label><input type="text" data-f="trapId" value="${esc(f.trapId)}" oninput="App.form.idEdited=true"></div>
+      <div><label class="f">設置者</label><select data-f="owner">${(this.state?.users||[{name:this.me()}]).map(u=>`<option ${u.name===f.owner?'selected':''}>${esc(u.name)}</option>`).join('')}</select></div></div>
+      ${this.locBlock()}${this.dateBlock()}
+      <label class="f">目印・設置場所メモ</label><textarea data-f="memo" placeholder="例：沢沿いの獣道、赤テープ">${esc(f.memo||'')}</textarea>
+      ${this.photoBlock()}
+      <div class="hint">標識（住所・氏名・登録番号等）の装着を忘れずに。わなは1人30基まで。</div>
+      <button class="btn" onclick="App.saveSet()">設置を記録</button>`)}};
+    this.renderForm();
+  },
+  async saveSet(){this.readInputs();const f=this.form;
+    if(!f.trapId)return toast('罠IDを入れてください');
+    if(!this.loc&&!f.meshOverride)return toast('位置が取れていません。再取得するか番号を手入力してください');
+    const dup=this.activeTraps().find(t=>t.id===f.trapId);
+    if(dup&&!confirm(`${f.trapId} は稼働中です。移設として場所を更新しますか？`))return;
+    const mine=this.activeTraps().filter(t=>t.owner===f.owner).length+(dup?0:1);
+    if(mine>30&&!confirm(`${f.owner}さんの稼働中の罠が${mine}基になります（上限30基）。続けますか？`))return;
+    const ev={...this.baseEvent('set'),trapId:f.trapId.trim(),trapType:f.trapType,owner:f.owner,photos:f.photos||[]};
+    await this.enqueue(ev);this.closeSheet();toast(`${ev.trapId} を設置しました`);
+  },
+
+  // 見回り
+  formCheck(preId){
+    const traps=this.activeTraps();
+    if(!traps.length)return toast('稼働中の罠がありません');
+    this.form={useLoc:true,sel:{},res:{},render:()=>{const f=this.form;
+      this.openSheet('見回り',`
+      <div class="small">チェックした罠を「見回り済み」にします。結果を変えたい罠だけ選び直してください。</div>
+      <div class="row" style="margin:10px 0"><button class="btn sec" style="margin:0" onclick="App.selAll(true)">自分の罠を全選択</button><button class="btn sec" style="margin:0" onclick="App.selAll(false)">全解除</button></div>
+      ${traps.map(t=>`<div class="checkrow"><input type="checkbox" data-sel="${esc(t.id)}" ${f.sel[t.id]?'checked':''}><div class="nm">${esc(t.id)}</div>
+        <select data-res="${esc(t.id)}">${CHECK_RESULTS.map(r=>`<option ${f.res[t.id]===r?'selected':''}>${r}</option>`).join('')}</select></div>`).join('')}
+      ${this.weatherBlock()}${this.dateBlock()}
+      <label class="f">メモ</label><textarea data-f="memo" placeholder="例：新しい足跡、餌の食べ跡">${esc(f.memo||'')}</textarea>
+      <div class="hint">獲れていたら「捕獲」から記録してください（見回りも同時に記録されます）。</div>
+      <button class="btn" onclick="App.saveCheck()">見回りを記録</button>`)}};
+    traps.forEach(t=>{this.form.sel[t.id]=preId?t.id===preId:t.owner===this.me();this.form.res[t.id]='異常なし'});
+    this.renderForm();
+  },
+  selAll(on){this.readChecks();this.activeTraps().forEach(t=>this.form.sel[t.id]=on?t.owner===this.me():false);this.renderForm()},
+  readChecks(){this.readInputs();$('#sheetBody').querySelectorAll('[data-sel]').forEach(el=>this.form.sel[el.dataset.sel]=el.checked);$('#sheetBody').querySelectorAll('[data-res]').forEach(el=>this.form.res[el.dataset.res]=el.value)},
+  async saveCheck(){this.readChecks();const f=this.form;const ids=Object.keys(f.sel).filter(k=>f.sel[k]);
+    if(!ids.length)return toast('罠を選んでください');
+    for(const id of ids){const t=this.traps().find(x=>x.id===id);const ev={...this.baseEvent('check'),trapId:id,trapType:t?.type||'',mesh:t?.mesh||'',city:t?.city||'',oaza:t?.oaza||'',checkResult:f.res[id]||'異常なし'};await this.enqueue(ev,true)}
+    this.closeSheet();toast(`${ids.length}基の見回りを記録しました`);this.sync();
+  },
+
+  // 捕獲
+  formCatch(preId){
+    const traps=this.activeTraps();
+    this.form={trapId:preId||(traps.find(t=>t.owner===this.me())||traps[0]||{}).id||'',species:'ニホンジカ',male:0,female:0,unknown:0,disposal:'',toggle:['disposal'],render:()=>{const f=this.form;const deer=/ジカ|シカ/.test(f.species);
+      this.openSheet('捕獲',`
+      <label class="f">掛かった罠</label><select data-f="trapId" onchange="App.readInputs();App.renderForm()"><option value="">（罠台帳にない罠・その他）</option>${traps.map(t=>`<option value="${esc(t.id)}" ${t.id===f.trapId?'selected':''}>${esc(t.id)}　${esc(t.type)}　${esc(t.mesh||'')} ${esc(t.oaza||'')}（${esc(t.owner)}）</option>`).join('')}</select>
+      ${f.trapId?'':this.locBlock()+`<label class="f">猟具</label>${this.chipHtml('trapType',TRAP_TYPES.map(x=>x.v),f.trapType)}`}
+      <label class="f">鳥獣の種類</label>${this.chipHtml('species',SPECIES,f.species)}
+      <label class="f">頭数</label><div class="row">${['male','female','unknown'].map((k,i)=>`<div><div class="stepper-l">${['オス','メス','不明'][i]}</div><div class="stepper"><button type="button" onclick="App.step('${k}',-1)">−</button><span>${f[k]}</span><button type="button" onclick="App.step('${k}',1)">＋</button></div></div>`).join('')}</div>
+      <div class="row"><div><label class="f">推定体重(kg)</label><input type="number" inputmode="decimal" data-f="weight" value="${esc(f.weight||'')}"></div></div>
+      <label class="f">処理方法</label>${this.chipHtml('disposal',DISPOSAL,f.disposal)}
+      ${this.dateBlock()}
+      ${this.photoBlock(deer?'<b>シカ捕獲強化事業の写真（1頭ごと）</b><br>1枚目：個体全体・<b>頭は右向き</b>・用紙（登録証・捕獲用紙）が個体にかからない<br>2枚目：個体と用紙を動かさず、個体の一部と用紙のアップ<br>尾（尾先から3分の2程度）の採取も忘れずに':'')}
+      <label class="f">メモ</label><textarea data-f="memo" placeholder="例：右前足、止め刺し済み">${esc(f.memo||'')}</textarea>
+      <label class="checkrow" style="margin-top:12px"><input type="checkbox" data-f="removeAfter" ${f.removeAfter?'checked':''}><span>この罠はこのまま撤去する</span></label>
+      <button class="btn" style="background:var(--orange)" onclick="App.saveCatch()">捕獲を記録</button>`)}};
+    this.renderForm();
+  },
+  step(k,d){this.readInputs();this.form[k]=Math.max(0,(+this.form[k]||0)+d);this.renderForm()},
+  async saveCatch(){this.readInputs();const f=this.form;const n=(+f.male||0)+(+f.female||0)+(+f.unknown||0);
+    if(!n)return toast('頭数を入れてください（オス・メス・不明）');
+    const s=this.settings(),d=f.date||today();
+    if(!/ジカ|シカ|イノシシ/.test(f.species)&&d>s.otherEnd&&!confirm('シカ・イノシシ以外の猟期（'+md(s.otherEnd)+'まで）を過ぎています。記録しますか？'))return;
+    const t=this.traps().find(x=>x.id===f.trapId);
+    const base=this.baseEvent('catch');
+    const ev={...base,trapId:f.trapId||'',trapType:t?.type||f.trapType||'くくりわな',species:f.species,male:+f.male||0,female:+f.female||0,unknown:+f.unknown||0,weight:f.weight||'',disposal:f.disposal||'',photos:f.photos||[]};
+    if(t){ev.mesh=t.mesh||ev.mesh;ev.city=t.city||'';ev.oaza=t.oaza||''}
+    await this.enqueue(ev,true);
+    if(f.removeAfter&&t)await this.enqueue({...this.baseEvent('remove'),trapId:t.id,trapType:t.type,mesh:t.mesh,city:t.city,oaza:t.oaza,memo:'捕獲後に撤去'},true);
+    this.closeSheet();toast('捕獲を記録しました');this.sync();
+  },
+
+  // 撤去
+  formRemove(preId){
+    const traps=this.activeTraps();if(!traps.length)return toast('稼働中の罠がありません');
+    this.form={sel:{},res:{},render:()=>{const f=this.form;
+      this.openSheet('罠を撤去',`<div class="small">撤去した罠を選んでください。出猟カレンダーの「終了日」になります。</div><div style="margin-top:10px">
+      ${traps.map(t=>`<label class="checkrow"><input type="checkbox" data-sel="${esc(t.id)}" ${f.sel[t.id]?'checked':''}><span class="nm">${esc(t.id)}</span><span class="small">${esc(t.type)}・${esc(t.mesh||'')} ${esc(t.oaza||'')}（${esc(t.owner)}）</span></label>`).join('')}</div>
+      ${this.dateBlock()}<label class="f">メモ</label><textarea data-f="memo">${esc(f.memo||'')}</textarea>
+      <button class="btn" style="background:#555" onclick="App.saveRemove()">撤去を記録</button>`)}};
+    if(preId)this.form.sel[preId]=true;
+    this.renderForm();
+  },
+  async saveRemove(){this.readChecks();const f=this.form;const ids=Object.keys(f.sel).filter(k=>f.sel[k]);if(!ids.length)return toast('罠を選んでください');
+    for(const id of ids){const t=this.traps().find(x=>x.id===id);await this.enqueue({...this.baseEvent('remove'),trapId:id,trapType:t?.type||'',mesh:t?.mesh||'',city:t?.city||'',oaza:t?.oaza||''},true)}
+    this.closeSheet();toast(`${ids.length}基を撤去しました`);this.sync();
+  },
+
+  // メモ
+  formNote(){this.form={useLoc:true,render:()=>{const f=this.form;this.openSheet('痕跡・メモ',`${this.locBlock()}
+    <label class="f">内容</label><textarea data-f="memo" placeholder="例：ヌタ場あり、新しい足跡、掘り返し">${esc(f.memo||'')}</textarea>${this.photoBlock()}${this.dateBlock()}
+    <button class="btn" style="background:#7a5a2f" onclick="App.saveNote()">メモを記録</button>`)}};this.renderForm()},
+  async saveNote(){this.readInputs();const f=this.form;if(!f.memo&&!(f.photos||[]).length)return toast('内容か写真を入れてください');
+    await this.enqueue({...this.baseEvent('note'),photos:f.photos||[]});this.closeSheet();toast('メモを記録しました')},
+
+  // 罠をタップ
+  trapMenu(id){const t=this.traps().find(x=>x.id===id);if(!t)return;
+    const map=t.lat&&t.lon?`https://www.google.com/maps/search/?api=1&query=${t.lat},${t.lon}`:'';
+    this.form={};this.openSheet(id,`<div class="card"><div><span class="tag ${typeCls(t.type)}">${esc(t.type)}</span> 設置者 ${esc(t.owner)}</div>
+      <div style="font-size:20px;font-weight:800;margin-top:6px">${esc(t.mesh||'---')} <span style="font-size:15px;font-weight:600">${esc((t.city||'')+(t.oaza||''))}</span></div>
+      <div class="small">設置 ${md(t.setDate)}・最終見回り ${md(t.lastCheck)||'-'}・捕獲 ${+t.catches||0}頭</div>${t.memo?`<div class="small">メモ：${esc(t.memo)}</div>`:''}</div>
+      <button class="btn" style="background:var(--blue)" onclick="App.quickCheck('${esc(id)}')">見回り：異常なし（ワンタップ）</button>
+      <button class="btn" style="background:var(--orange)" onclick="App.formCatch('${esc(id)}')">捕獲を記録</button>
+      <button class="btn sec" onclick="App.formCheck('${esc(id)}')">見回り（結果を選ぶ）</button>
+      <button class="btn sec" onclick="App.formRemove('${esc(id)}')">撤去</button>
+      ${map?`<a class="btn sec" style="display:block;text-align:center;text-decoration:none" href="${map}" target="_blank" rel="noopener">地図で場所を見る</a>`:''}`)},
+  async quickCheck(id){const t=this.traps().find(x=>x.id===id);this.form={};
+    await this.enqueue({...this.baseEvent('check'),trapId:id,trapType:t?.type||'',mesh:t?.mesh||'',city:t?.city||'',oaza:t?.oaza||'',checkResult:'異常なし',weather:this.weather?.w||'',temp:this.weather?.temp??''});
+    this.closeSheet();toast(`${id} 見回り済み`)},
+
+  // ---------- キューと同期 ----------
+  async enqueue(ev,noSync){const item={id:ev.id,seq:Date.now()+Math.random(),ev};await DB.put(item);this.queue.push(item);this.render();if(!noSync)this.sync()},
+  async post(body){
+    const ctl=new AbortController();const tm=setTimeout(()=>ctl.abort(),45000);
+    try{const r=await fetch(this.cfg.api,{method:'POST',body:JSON.stringify({...body,token:this.cfg.token}),signal:ctl.signal,redirect:'follow'});
+      const j=await r.json();if(!j.ok)throw new Error(j.error||'サーバーエラー');return j}finally{clearTimeout(tm)}
+  },
+  async sync(manual){
+    if(this.syncing||!this.cfg.api||!this.cfg.token)return;
+    if(!navigator.onLine){if(manual)toast('圏外です。電波が戻ったら自動で送ります');return}
+    this.syncing=true;this.render();
+    try{
+      this.queue=await DB.all();
+      let res=null;
+      while(this.queue.length){
+        // 写真付きは1件ずつ、それ以外は最大20件まとめて
+        const batch=[];for(const q of this.queue){if(batch.length&&(q.ev.photos||[]).length)break;batch.push(q);if((q.ev.photos||[]).length||batch.length>=20)break}
+        res=await this.post({action:'sync',events:batch.map(b=>b.ev)});
+        const ok=new Set(res.applied||[]);
+        for(const b of batch){if(ok.has(b.id)){await DB.del(b.id);const {photos,...lite}=b.ev;lite.photoCount=(photos||[]).length;this.history.unshift(lite)}}
+        this.history=this.history.slice(0,60);LS.set('history',this.history);
+        this.queue=await DB.all();
+        if(!batch.every(b=>ok.has(b.id)))throw new Error('一部が保存されませんでした');
+      }
+      if(!res)res=await this.post({action:'state'});
+      this.state=res.state;LS.set('state',this.state);
+      this.lastErr='';if(manual)toast('同期しました');
+    }catch(e){this.lastErr=String(e.message||e);if(manual)toast('送信できませんでした：'+this.lastErr,4000)}
+    finally{this.syncing=false;this.render()}
+  },
+
+  // ---------- 設定 ----------
+  openSettings(){this.form={};this.openSheet('設定',`
+    <div class="small">招待リンクを開けば自動で入ります。手で入れる場合はスプレッドシートの「ユーザー」シートのトークンと、ウェブアプリのURLを入れてください。</div>
+    <label class="f">サーバーURL（GASウェブアプリ）</label><input type="text" id="cfgApi" value="${esc(this.cfg.api)}" placeholder="https://script.google.com/macros/s/…/exec">
+    <label class="f">トークン</label><input type="text" id="cfgToken" value="${esc(this.cfg.token)}">
+    <button class="btn" onclick="App.saveSettings()">保存して接続</button>
+    <div class="card" style="margin-top:16px"><div class="small">利用者：${esc(this.me()||'未接続')}・未送信：${this.queue.length}件${this.lastErr?`<br>最後のエラー：${esc(this.lastErr)}`:''}</div></div>
+    <button class="btn sec" onclick="App.exportQueue()">未送信データを書き出す（予備）</button>
+    <p class="small">位置図番号は「京都府鳥獣保護区等位置図（令和8年度）」の3桁番号をGPSから計算しています。区画の境界付近では、紙の位置図でも確認してください。</p>`)},
+  async saveSettings(){this.cfg={api:$('#cfgApi').value.trim(),token:$('#cfgToken').value.trim()};LS.set('cfg',this.cfg);this.closeSheet();await this.sync(true)},
+  async exportQueue(){const q=await DB.all();const blob=new Blob([JSON.stringify(q.map(x=>x.ev),null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='wanalog_unsent_'+today()+'.json';a.click()}
+};
+
+function resizeImage(file,max,q){return new Promise((res,rej)=>{const img=new Image();const url=URL.createObjectURL(file);img.onload=()=>{let {width:w,height:h}=img;const s=Math.min(1,max/Math.max(w,h));w=Math.round(w*s);h=Math.round(h*s);const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);URL.revokeObjectURL(url);res(c.toDataURL('image/jpeg',q))};img.onerror=rej;img.src=url})}
+
+App.init();
+</script>
+</body>
+</html>
