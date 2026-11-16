@@ -193,8 +193,8 @@ const SPECIES=['ニホンジカ','イノシシ','アナグマ','アライグマ'
 const DISPOSAL=['食肉加工施設','自家消費','埋設','保管庫'];
 const CHECK_RESULTS=['異常なし','空はじき','掛け直し','破損・要修理','錯誤捕獲（放獣）'];
 const WEATHERS=['晴れ','曇り','雨','雪','霧'];
-const TYPE_JA={set:'設置',check:'見回り',catch:'捕獲',remove:'撤去',note:'メモ',fix:'位置補正',photo:'写真追加'};
-const KIND_EN={'設置':'set','見回り':'check','捕獲':'catch','撤去':'remove','メモ':'note','位置補正':'fix','写真追加':'photo'};
+const TYPE_JA={set:'設置',check:'見回り',catch:'捕獲',remove:'撤去',note:'メモ',fix:'位置補正',photo:'写真追加',edit:'情報修正'};
+const KIND_EN={'設置':'set','見回り':'check','捕獲':'catch','撤去':'remove','メモ':'note','位置補正':'fix','写真追加':'photo','情報修正':'edit'};
 const NOIMG='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10" fill="#e8ebe8"/></svg>');
 const typeCls=t=>(TRAP_TYPES.find(x=>t&&t.indexOf(x.v.slice(0,2))===0)||{c:''}).c;
 
@@ -237,6 +237,8 @@ const App={
         if(e.type==='catch')t.catches=(+t.catches||0)+(+e.male||0)+(+e.female||0)+(+e.unknown||0);
         if(e.type==='remove'){t.status='撤去済';t.removeDate=e.date;t.pending=true}
         if(e.type==='fix'){Object.assign(t,{lat:e.lat,lon:e.lon,mesh:e.mesh,city:e.city||t.city,oaza:e.oaza||t.oaza,pending:true})}
+        if(e.type==='edit'){Object.assign(t,{type:e.trapType||t.type,owner:e.owner||t.owner,setDate:e.setDate||t.setDate,memo:e.trapMemo??t.memo,pending:true});
+          if(e.restore){t.status='稼働中';t.removeDate=''}else if(e.removeDate)t.removeDate=e.removeDate}
       }}
     return [...m.values()];
   },
@@ -463,10 +465,11 @@ const App={
       <div style="font-size:20px;font-weight:800;margin-top:6px">${esc(t.mesh||'---')} <span style="font-size:15px;font-weight:600">${esc((t.city||'')+(t.oaza||''))}</span></div>
       <div class="small">設置 ${md(t.setDate)}・最終見回り ${md(t.lastCheck)||'-'}・捕獲 ${+t.catches||0}頭</div>${t.memo?`<div class="small">メモ：${esc(t.memo)}</div>`:''}
       ${this.stripHtml(id,6)}</div>
-      <button class="btn" style="background:var(--blue)" onclick="App.quickCheck('${esc(id)}')">見回り：異常なし（ワンタップ）</button>
+      ${t.status==='稼働中'?`<button class="btn" style="background:var(--blue)" onclick="App.quickCheck('${esc(id)}')">見回り：異常なし（ワンタップ）</button>
       <button class="btn" style="background:var(--orange)" onclick="App.formCatch('${esc(id)}')">捕獲を記録</button>
       <button class="btn sec" onclick="App.formCheck('${esc(id)}')">見回り（結果を選ぶ）</button>
-      <button class="btn sec" onclick="App.formRemove('${esc(id)}')">撤去</button>
+      <button class="btn sec" onclick="App.formRemove('${esc(id)}')">撤去</button>`:`<div class="alert">この罠は撤去済みです（${md(t.removeDate)}）。間違えて撤去した場合は「罠の情報を直す」から戻せます。</div>`}
+      <button class="btn sec" onclick="App.formEdit('${esc(id)}')">罠の情報を直す（種類・設置者・日付・メモ）</button>
       <div class="row"><button class="btn sec" onclick="App.openPhotos('${esc(id)}')">写真を見る（${this.trapPhotos(id).length}枚）</button><button class="btn sec" onclick="App.formPhoto('${esc(id)}')">写真を追加</button></div>
       ${t.lat&&t.lon?`<button class="btn sec" onclick="App.closeSheet();App.openMap('${esc(id)}')">地図で見る・位置を補正</button>`:`<button class="btn sec" onclick="App.closeSheet();App.openMap('${esc(id)}',true)">地図で位置を登録</button>`}
       ${map?`<a class="btn sec" style="display:block;text-align:center;text-decoration:none" href="${map}" target="_blank" rel="noopener">Googleマップで開く</a>`:''}`);this.fillThumbs($('#sheetBody'))},
@@ -521,6 +524,30 @@ const App={
     const ev={...this.baseEvent('photo'),trapId:id,trapType:t?.type||'',mesh:t?.mesh||'',city:t?.city||'',oaza:t?.oaza||'',photos:f.photos};
     this.closeSheet();toast(`${id} に写真を追加しました`);
     try{await this.enqueue(ev)}catch(e){toast('保存できませんでした：'+(e.message||e),6000)}},
+  // 罠の情報を直す
+  formEdit(id){const t=this.traps().find(x=>x.id===id);if(!t)return;const removed=t.status!=='稼働中';
+    this.form={trapType:(TRAP_TYPES.find(x=>t.type&&t.type.indexOf(x.v.slice(0,2))===0)||TRAP_TYPES[0]).v,owner:t.owner,setDate:t.setDate,removeDate:t.removeDate||'',trapMemo:t.memo||'',restore:false,render:()=>{const f=this.form;
+      this.openSheet(id+' の情報を直す',`
+      <div class="small">罠IDは記録のつながりに使うため変えられません。位置は地図の「位置を補正」で直します。</div>
+      <label class="f">わなの種類</label>${this.chipHtml('trapType',TRAP_TYPES.map(x=>x.v),f.trapType)}
+      <label class="f">設置者</label><select data-f="owner">${(this.state?.users||[{name:t.owner}]).map(u=>`<option ${u.name===f.owner?'selected':''}>${esc(u.name)}</option>`).join('')}</select>
+      <div class="row"><div><label class="f">設置日</label><input type="date" data-f="setDate" value="${esc(f.setDate||'')}"></div>
+      ${removed?`<div><label class="f">撤去日</label><input type="date" data-f="removeDate" value="${esc(f.removeDate||'')}"></div>`:''}</div>
+      ${removed?`<label class="checkrow" style="margin-top:12px"><input type="checkbox" data-f="restore" ${f.restore?'checked':''}><span>撤去を取り消して「稼働中」に戻す</span></label>`:''}
+      <label class="f">目印・設置場所メモ</label><textarea data-f="trapMemo">${esc(f.trapMemo||'')}</textarea>
+      <label class="f">直した理由（任意）</label><input type="text" data-f="memo" value="${esc(f.memo||'')}" placeholder="例：種類の選び間違い">
+      <div class="hint">出猟カレンダー・登録証裏面などは、次に「提出用の表を作成」したときに反映されます。</div>
+      <button class="btn" onclick="App.saveEdit('${esc(id)}')">この内容で直す</button>`)}};this.renderForm()},
+  async saveEdit(id){this.readInputs();const f=this.form;const t=this.traps().find(x=>x.id===id);if(!t)return;
+    if(!f.setDate)return toast('設置日を入れてください');
+    if(f.removeDate&&f.removeDate<f.setDate)return toast('撤去日が設置日より前になっています');
+    const ev={id:uid(),type:'edit',date:today(),time:nowTime(),trapId:id,trapType:f.trapType,owner:f.owner,setDate:f.setDate,
+      removeDate:t.status!=='稼働中'&&!f.restore?f.removeDate:'',restore:!!f.restore,trapMemo:f.trapMemo,memo:f.memo||'',byName:this.me(),lat:'',lon:''};
+    const same=ev.trapType===((TRAP_TYPES.find(x=>t.type&&t.type.indexOf(x.v.slice(0,2))===0)||{}).v)&&ev.owner===t.owner&&ev.setDate===t.setDate&&ev.trapMemo===(t.memo||'')&&!ev.restore&&(!ev.removeDate||ev.removeDate===t.removeDate);
+    if(same)return toast('変更がありません');
+    this.closeSheet();toast(`${id} の情報を直しました`);
+    try{await this.enqueue(ev)}catch(e){toast('保存できませんでした：'+(e.message||e),6000)}
+    if(this.map&&$('#mapView').classList.contains('open'))this.drawTraps()},
   async quickCheck(id){const t=this.traps().find(x=>x.id===id);this.form={};
     await this.enqueue({...this.baseEvent('check'),trapId:id,trapType:t?.type||'',mesh:t?.mesh||'',city:t?.city||'',oaza:t?.oaza||'',checkResult:'異常なし',weather:this.weather?.w||'',temp:this.weather?.temp??''});
     this.closeSheet();toast(`${id} 見回り済み`)},
@@ -579,6 +606,7 @@ const App={
       mk.bindTooltip(esc(t.id)+(np?' 📷':''),{permanent:true,direction:'right',offset:[10,0],className:'trap-label'});
       const gm=`https://www.google.com/maps/search/?api=1&query=${t.lat},${t.lon}`;
       mk.bindPopup(`<b style="font-size:16px">${esc(t.id)}</b> ${esc(t.type)}<br>${esc(t.status)}・設置者 ${esc(t.owner)}<br><b>${esc(t.mesh||'---')}</b> ${esc((t.city||'')+(t.oaza||''))}<br><span style="color:#666">設置 ${md(t.setDate)}${active?`・見回り ${md(t.lastCheck)||'-'}`:`・撤去 ${md(t.removeDate)}`}</span>
+        <button class="pbtn" style="background:#2a5b8a" onclick="App.trapMenu('${esc(t.id)}')">詳細・記録・編集</button>
         ${this.stripHtml(t.id,3)}${np?`<button class="pbtn sec" onclick="App.openPhotos('${esc(t.id)}')">写真をすべて見る（${np}枚）</button>`:''}
         ${active?`<button class="pbtn" onclick="App.startFix('${esc(t.id)}')">位置を補正する</button>`:''}
         <a class="pbtn sec" href="${gm}" target="_blank" rel="noopener">Googleマップで開く</a>`);
