@@ -144,7 +144,7 @@ a{color:var(--blue)}
   <div id="mapWrap"><div id="map"></div>
   <svg id="crosshair" viewBox="0 0 44 44"><circle cx="22" cy="22" r="9" fill="none" stroke="#c8611d" stroke-width="3"/><path d="M22 0v13M22 31v13M0 22h13M31 22h13" stroke="#c8611d" stroke-width="3"/></svg>
   <div id="fixPanel"></div></div></div>
-<div id="viewer" onclick="App.closeViewer()"><button class="x">閉じる</button><img id="viewerImg" alt=""><div class="cap" id="viewerCap"></div></div>
+<div id="viewer" onclick="App.closeViewer()"><button class="x">閉じる</button><button class="x" style="right:auto;left:10px" onclick="event.stopPropagation();App.saveViewer()">スマホに保存</button><img id="viewerImg" alt=""><div class="cap" id="viewerCap"></div></div>
 <div class="toast" id="toast"></div>
 <input type="file" id="fileIn" accept="image/*" capture="environment" style="display:none">
 
@@ -164,6 +164,7 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad=n=>String(n).padStart(2,'0');
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
+const stamp=()=>{const d=new Date();return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`};
 const nowTime=()=>{const d=new Date();return `${pad(d.getHours())}:${pad(d.getMinutes())}`};
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const daysBetween=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000);
@@ -355,8 +356,8 @@ const App={
       <button class="iconbtn" type="button" onclick="App.readInputs();App.locate()">再取得</button></div>
       <div class="mini">番号を手で直す場合：<input type="text" inputmode="numeric" maxlength="3" style="width:90px;display:inline-block;padding:6px 8px;font-size:16px" data-f="meshOverride" value="${esc(f.meshOverride||'')}" placeholder="例 106"></div></div>`;
   },
-  photoBlock(hint){return `<label class="f">写真（任意・何枚でも）</label>${hint?`<div class="hint">${hint}</div>`:''}<div class="photos">${(this.form.photos||[]).map((p,i)=>`<img src="${p.thumb||p.dataUrl}" onclick="App.delPhoto(${i})">`).join('')}<button type="button" class="iconbtn" style="width:84px;height:84px" onclick="App.addPhoto()">＋撮影</button></div>${(this.form.photos||[]).length?'<div class="mini">写真をタップで削除</div>':''}`},
-  addPhoto(){this.readInputs();const fi=$('#fileIn');fi.value='';fi.onchange=async()=>{const f=fi.files[0];if(!f)return;toast('写真を縮小しています…',1500);const dataUrl=await resizeImage(f,1280,.75);const thumb=await resizeImage(f,360,.7);(this.form.photos=this.form.photos||[]).push({dataUrl,thumb});this.renderForm()};fi.click()},
+  photoBlock(hint){return `<label class="f">写真（任意・何枚でも）${this.savePhotosOn()?'<span class="mini">　撮った写真はスマホにも保存されます</span>':''}</label>${hint?`<div class="hint">${hint}</div>`:''}<div class="photos">${(this.form.photos||[]).map((p,i)=>`<img src="${p.thumb||p.dataUrl}" onclick="App.delPhoto(${i})">`).join('')}<button type="button" class="iconbtn" style="width:84px;height:84px" onclick="App.addPhoto()">＋撮影</button></div>${(this.form.photos||[]).length?'<div class="mini">写真をタップで削除</div>':''}`},
+  addPhoto(){this.readInputs();const fi=$('#fileIn');fi.value='';fi.onchange=async()=>{const f=fi.files[0];if(!f)return;if(this.savePhotosOn())this.download(f,'wana_'+stamp()+'.jpg','写真をスマホ（ダウンロード）にも保存しました');else toast('写真を縮小しています…',1500);const dataUrl=await resizeImage(f,1280,.75);const thumb=await resizeImage(f,360,.7);(this.form.photos=this.form.photos||[]).push({dataUrl,thumb});this.renderForm()};fi.click()},
   delPhoto(i){if(confirm('この写真を削除しますか？')){this.readInputs();this.form.photos.splice(i,1);this.renderForm()}},
   dateBlock(){return `<div class="row"><div><label class="f">日付</label><input type="date" data-f="date" value="${esc(this.form.date||today())}"></div><div><label class="f">時刻</label><input type="time" data-f="time" value="${esc(this.form.time||nowTime())}"></div></div>`},
   weatherBlock(){const f=this.form;if(f.weather===undefined&&this.weather){f.weather=this.weather.w;f.temp=this.weather.temp}
@@ -525,6 +526,12 @@ const App={
     if(!navigator.onLine||!this.cfg.api){$('#viewerCap').textContent+='（圏外のため縮小版）';return}
     try{const r=await this.post({action:'photo',id:p.id});const d=r.images?.[p.id];if(d){(this.fullMem=this.fullMem||{})[p.id]=d;if($('#viewer').classList.contains('open'))img.src=d}}catch(e){}
   },
+  savePhotosOn(){return LS.get('savePhotos',true)!==false},
+  // ファイルをスマホに保存（Androidは「ダウンロード」フォルダ。Googleフォトの「Download」にも出る）
+  download(blobOrUrl,name,msg){try{const url=typeof blobOrUrl==='string'?blobOrUrl:URL.createObjectURL(blobOrUrl);const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+    if(typeof blobOrUrl!=='string')setTimeout(()=>URL.revokeObjectURL(url),20000);if(msg)toast(msg,2500)}catch(e){toast('保存できませんでした')}},
+  saveViewer(){const img=$('#viewerImg');if(!img.src||img.src===NOIMG)return;const small=img.naturalWidth&&img.naturalWidth<600;
+    this.download(img.src,'wana_'+stamp()+'.jpg',small?'縮小版を保存しました（電波のある所で開くと元の大きさで保存できます）':'スマホに保存しました')},
   closeViewer(){$('#viewer').classList.remove('open');$('#viewerImg').src=''},
   formPhoto(id){const t=this.traps().find(x=>x.id===id);if(!t)return;
     this.form={render:()=>{const f=this.form;this.openSheet(id+' に写真を追加',`
@@ -703,6 +710,7 @@ const App={
     <label class="f">サーバーURL（GASウェブアプリ）</label><input type="text" id="cfgApi" value="${esc(this.cfg.api)}" placeholder="https://script.google.com/macros/s/…/exec">
     <label class="f">トークン</label><input type="text" id="cfgToken" value="${esc(this.cfg.token)}">
     <button class="btn" onclick="App.saveSettings()">保存して接続</button>
+    <label class="checkrow" style="margin-top:14px"><input type="checkbox" id="cfgSavePhotos" ${this.savePhotosOn()?'checked':''} onchange="LS.set('savePhotos',this.checked);toast(this.checked?'撮った写真をスマホにも保存します':'スマホへの保存をやめました')"><span>アプリで撮った写真をスマホにも保存する（「ダウンロード」フォルダ）</span></label>
     <div class="card" style="margin-top:16px"><div class="small">利用者：${esc(this.me()||'未接続')}・未送信：${this.queue.length}件${this.lastErr?`<br>最後のエラー：${esc(this.lastErr)}（${esc({offline:'圏外',net:'電波・通信',auth:'招待リンク',server:'サーバー'}[this.errKind]||'')}）`:''}</div></div>
     <button class="btn sec" onclick="App.exportQueue()">未送信データを書き出す（予備）</button>
     <p class="small">位置図番号は「京都府鳥獣保護区等位置図（令和8年度）」の3桁番号をGPSから計算しています。区画の境界付近では、紙の位置図でも確認してください。</p>`)},
