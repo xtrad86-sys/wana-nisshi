@@ -19,7 +19,27 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif}
 header{position:sticky;top:0;z-index:5;background:var(--green);color:#fff;padding:10px 14px calc(10px) 14px;padding-top:max(10px,env(safe-area-inset-top));display:flex;align-items:center;gap:10px}
-header h1{font-size:17px;margin:0;flex:1;font-weight:700;letter-spacing:.02em}
+header h1{font-size:17px;margin:0;flex:1;font-weight:700;letter-spacing:.02em;display:flex;align-items:center;gap:8px;min-width:0}
+header h1 .hlogo{width:32px;height:32px;flex:0 0 auto;border-radius:50%}
+header h1 .ttl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 起動画面 */
+#splash{position:fixed;inset:0;z-index:80;background:radial-gradient(circle at 50% 40%,#2a3a24 0,#0e140f 66%);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#e9dcbc;transition:opacity .45s}
+#splash.hide{opacity:0;pointer-events:none}
+#splash img{width:min(82vw,340px);height:auto;border-radius:50%;filter:drop-shadow(0 8px 24px rgba(0,0,0,.6))}
+#splash .t1{font-size:28px;font-weight:900;letter-spacing:.18em;margin-top:22px;color:#fff}
+#splash .t2{font-size:12px;letter-spacing:.32em;color:#c9a24a;margin-top:6px}
+#splash .t3{font-size:12px;opacity:.7;margin-top:26px}
+/* 更新のお知らせ */
+#notice{display:none;position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.55);align-items:center;justify-content:center;padding:20px}
+#notice.open{display:flex}
+#notice .box{background:#fff;border-radius:18px;max-width:420px;width:100%;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+#notice .top{background:#14241b;color:#fff;padding:18px;display:flex;gap:14px;align-items:center}
+#notice .top img{width:64px;height:64px;border-radius:50%}
+#notice .top b{font-size:18px;display:block}
+#notice .top span{font-size:12px;color:#c9a24a;letter-spacing:.1em}
+#notice ul{margin:14px 18px 6px;padding-left:20px;line-height:1.6;font-size:15px}
+#notice .btns{display:flex;flex-direction:column;gap:8px;padding:12px 18px 18px}
+.manualbtn{display:block;text-align:center;text-decoration:none}
 header .me{font-size:13px;opacity:.85}
 .badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;font-size:13px;background:rgba(255,255,255,.15);border:0;color:#fff}
 .badge.warn{background:var(--yellow);color:#3a2a00}
@@ -130,12 +150,14 @@ a{color:var(--blue)}
 </head>
 <body>
 <header>
-  <h1>わな猟日誌 <span class="me" id="meName"></span></h1>
+  <h1><img class="hlogo" src="logo-s.webp" alt=""><span class="ttl">わな猟日誌 <span class="me" id="meName"></span></span></h1>
   <button class="badge" onclick="App.openMap()" aria-label="地図">🗺 地図</button>
   <button class="badge" id="syncBadge" onclick="App.badgeTap()">…</button>
   <button class="badge" onclick="App.openSettings()" aria-label="設定">⚙</button>
 </header>
 <main id="main"></main>
+<div id="splash" onclick="this.classList.add('hide')"><img src="top.webp" alt="TRAP HUNTER MAP"><div class="t1">わな猟日誌</div><div class="t3" id="splashVer"></div></div>
+<div id="notice"><div class="box"><div class="top"><img src="logo-s.webp" alt=""><div><span>UPDATE</span><b id="noticeTitle"></b></div></div><ul id="noticeList"></ul><div class="btns"><button class="btn sec" id="noticeManual" onclick="App.openManual()">📖 マニュアル（PDF）を開く</button><button class="btn" onclick="App.closeNotice()">OK</button></div></div></div>
 <div class="sheet-bg" id="sheetBg" onclick="App.closeSheet()"></div>
 <div class="sheet" id="sheet"><div class="hd"><h3 id="sheetTitle"></h3><button class="iconbtn" onclick="App.closeSheet()">閉じる</button></div><div class="bd" id="sheetBody"></div></div>
 <div id="mapView"><div class="bar"><button onclick="App.closeMap()">← 戻る</button><b></b>
@@ -163,6 +185,18 @@ const MUNI={'26101':'京都市北区','26102':'京都市上京区','26103':'京�
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad=n=>String(n).padStart(2,'0');
+const APP_VER='3.8';
+// マニュアル（PDF）はGoogleドライブに置き、サーバー経由で招待リンクを持つ人だけが開ける
+// 更新のお知らせ（新しい版を上に足していく）
+const CHANGELOG={
+  '3.8':['起動画面を新しいロゴ（TRAP HUNTER MAP）に','マニュアル（PDF）をGoogleドライブから開くように（招待リンクを持つ人だけ）'],
+  '3.7':['起動画面とロゴを追加','アプリを更新したときに、このお知らせを表示','アプリからマニュアル（PDF）を開けるように（ホーム画面の下・⚙）'],
+  '3.6':['ホーム画面の下と⚙に、アプリ・サーバーの版を表示'],
+  '3.5':['ホーム画面のシカ事業の表示を「チーム合計」に'],
+  '3.4':['撮った写真をスマホ（ダウンロード）にも保存','拡大表示に「スマホに保存」'],
+  '3.3':['未送信のとき、原因（圏外・電波・招待リンク・サーバー）を画面に表示']
+};
+const verCmp=(a,b)=>{const x=String(a).split('.').map(Number),y=String(b).split('.').map(Number);for(let i=0;i<Math.max(x.length,y.length);i++){const d=(x[i]||0)-(y[i]||0);if(d)return d}return 0};
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
 const stamp=()=>{const d=new Date();return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`};
 const nowTime=()=>{const d=new Date();return `${pad(d.getHours())}:${pad(d.getMinutes())}`};
@@ -213,8 +247,11 @@ const App={
     // 招待リンク (?api=...&token=...)
     const q=new URLSearchParams(location.search);
     if(q.get('api')&&q.get('token')){this.cfg={api:q.get('api'),token:q.get('token')};LS.set('cfg',this.cfg);history.replaceState(null,'',location.pathname);toast('設定を読み込みました')}
+    {const mv=LS.get('state',null)?.manual?.ver;$('#splashVer').textContent='アプリ v'+APP_VER+(mv?'　マニュアル v'+mv:'')}
+    setTimeout(()=>$('#splash').classList.add('hide'),1300);
     this.queue=await DB.all();
     this.render();
+    setTimeout(()=>this.checkUpdateNotice(),1400);
     if(!this.cfg.api||!this.cfg.token){this.openSettings();}
     this.locate();
     this.sync();
@@ -327,7 +364,7 @@ const App={
     // シカ事業
     const deer=this.state?.deer;
     if(deer){const pct=Math.min(100,deer.total/Math.max(deer.min,1)*100);
-      h+=`<h2><span>シカ捕獲強化事業（${esc(s.group||'班')}）</span></h2><div class="card deer">
+      h+=`<h2><span>シカ捕獲強化事業（チーム合計）</span></h2><div class="card deer">
       <div><b style="font-size:22px">${deer.total}</b> 頭 <span class="small">（対象期間 〜${md(s.deerEnd)}・${deer.min}頭以上で支給）</span></div>
       <div class="bar"><i style="width:${pct}%"></i></div>
       <div class="small">${deer.eligible?`奨励金見込 ${deer.amount.toLocaleString()}円`:`あと ${deer.min-deer.total} 頭で支給対象`}・完了報告期限 ${md(s.deerReport)}</div>
@@ -337,7 +374,7 @@ const App={
     h+=`<h2><span>最近の記録</span></h2><div class="card">`;
     if(!recent.length)h+=`<div class="empty">まだ記録がありません</div>`;
     for(const e of recent){h+=`<div class="log"><div class="t">${md(e.date)} ${esc(e.time||'')}</div><div>${e.pending?'<span class="tag pending">未送信</span>':''}<b>${TYPE_JA[e.type]}</b> ${esc(e.trapId||'')} ${esc(e.species||'')}${e.type==='catch'?` ♂${e.male||0} ♀${e.female||0}${+e.unknown?' 不明'+e.unknown:''}`:''} ${esc(e.checkResult&&e.checkResult!=='異常なし'?e.checkResult:'')} <span class="small">${esc(e.mesh||'')}${e.byName&&e.byName!==this.me()?'・'+esc(e.byName):''}</span></div></div>`}
-    h+=`</div><p class="small" style="text-align:center">データはスプレッドシートに保存され、PCで編集できます。</p>`;
+    h+=`</div><button class="btn sec" style="margin-top:14px" onclick="App.openManual()">📖 使い方マニュアル${this.state?.manual?.ver?' v'+esc(this.state.manual.ver):''}（PDF）</button><p class="small" style="text-align:center">データはスプレッドシートに保存され、PCで編集できます。<br>わな猟日誌 アプリ v${APP_VER}${this.state?.serverVer?`・サーバー v${esc(this.state.serverVer)}`:''}</p>`;
     $('#main').innerHTML=h;
   },
 
@@ -532,6 +569,28 @@ const App={
     if(typeof blobOrUrl!=='string')setTimeout(()=>URL.revokeObjectURL(url),20000);if(msg)toast(msg,2500)}catch(e){toast('保存できませんでした')}},
   saveViewer(){const img=$('#viewerImg');if(!img.src||img.src===NOIMG)return;const small=img.naturalWidth&&img.naturalWidth<600;
     this.download(img.src,'wana_'+stamp()+'.jpg',small?'縮小版を保存しました（電波のある所で開くと元の大きさで保存できます）':'スマホに保存しました')},
+  // 前回開いた版と違えば、更新のお知らせを出す（初めて入れたときは出さない）
+  checkUpdateNotice(){const seen=LS.get('seenVer','');if(!seen){LS.set('seenVer',APP_VER);return}
+    if(seen===APP_VER)return;
+    const vers=Object.keys(CHANGELOG).filter(v=>verCmp(v,seen)>0&&verCmp(v,APP_VER)<=0).sort((a,b)=>verCmp(b,a));
+    const items=vers.flatMap(v=>CHANGELOG[v].map(t=>`<li>${esc(t)}<span class="mini">（v${v}）</span></li>`));
+    $('#noticeTitle').textContent=`v${APP_VER} に更新しました`;
+    $('#noticeList').innerHTML=items.join('')||'<li>細かな修正</li>';
+    {const mv=this.state?.manual?.ver;$('#noticeManual').textContent=`📖 マニュアル${mv?' v'+mv:''}（PDF）を開く`}
+    $('#notice').classList.add('open')},
+  // マニュアルPDF：サーバー（Googleドライブ）から取り、スマホにも残す（圏外でも開ける）
+  async openManual(){
+    const info=this.state?.manual;const cached=await DB.thumbGet('__manual');const cachedVer=LS.get('manualVer','');
+    const open=(dataUrl,ver)=>{this.download(dataUrl,`わな猟日誌_マニュアル${ver?'_v'+ver:''}.pdf`,'マニュアルをスマホの「ダウンロード」に保存しました。通知や「開く」から見られます')};
+    if(cached&&(!info||!navigator.onLine||cachedVer===info.ver))return open(cached,cachedVer);
+    if(!navigator.onLine||!this.cfg.api)return toast(cached?'':'マニュアルは電波のある所で一度開いてください',4000);
+    if(info===null||(this.state&&!info))return toast('マニュアルがまだ用意されていません（管理者に連絡）',4000);
+    toast('マニュアルを取得しています…',3000);
+    try{const r=await this.post({action:'manual'});if(!r.data)throw new Error('なし');const d='data:application/pdf;base64,'+r.data;
+      await DB.thumbPut('__manual',d);LS.set('manualVer',r.ver||'');open(d,r.ver)}
+    catch(e){if(cached)open(cached,cachedVer);else toast('マニュアルを取得できませんでした：'+(e.message||e),5000)}
+  },
+  closeNotice(){$('#notice').classList.remove('open');LS.set('seenVer',APP_VER)},
   closeViewer(){$('#viewer').classList.remove('open');$('#viewerImg').src=''},
   formPhoto(id){const t=this.traps().find(x=>x.id===id);if(!t)return;
     this.form={render:()=>{const f=this.form;this.openSheet(id+' に写真を追加',`
@@ -711,7 +770,8 @@ const App={
     <label class="f">トークン</label><input type="text" id="cfgToken" value="${esc(this.cfg.token)}">
     <button class="btn" onclick="App.saveSettings()">保存して接続</button>
     <label class="checkrow" style="margin-top:14px"><input type="checkbox" id="cfgSavePhotos" ${this.savePhotosOn()?'checked':''} onchange="LS.set('savePhotos',this.checked);toast(this.checked?'撮った写真をスマホにも保存します':'スマホへの保存をやめました')"><span>アプリで撮った写真をスマホにも保存する（「ダウンロード」フォルダ）</span></label>
-    <div class="card" style="margin-top:16px"><div class="small">利用者：${esc(this.me()||'未接続')}・未送信：${this.queue.length}件${this.lastErr?`<br>最後のエラー：${esc(this.lastErr)}（${esc({offline:'圏外',net:'電波・通信',auth:'招待リンク',server:'サーバー'}[this.errKind]||'')}）`:''}</div></div>
+    <div class="card" style="margin-top:16px"><div class="small">利用者：${esc(this.me()||'未接続')}・未送信：${this.queue.length}件<br>アプリ v${APP_VER}・サーバー ${this.state?.serverVer?'v'+esc(this.state.serverVer):'（確認できず）'}${this.lastErr?`<br>最後のエラー：${esc(this.lastErr)}（${esc({offline:'圏外',net:'電波・通信',auth:'招待リンク',server:'サーバー'}[this.errKind]||'')}）`:''}</div></div>
+    <button class="btn sec" onclick="App.openManual()">📖 使い方マニュアル${this.state?.manual?.ver?' v'+esc(this.state.manual.ver):''}（PDF）</button>
     <button class="btn sec" onclick="App.exportQueue()">未送信データを書き出す（予備）</button>
     <p class="small">位置図番号は「京都府鳥獣保護区等位置図（令和8年度）」の3桁番号をGPSから計算しています。区画の境界付近では、紙の位置図でも確認してください。</p>`)},
   async saveSettings(){this.cfg={api:$('#cfgApi').value.trim(),token:$('#cfgToken').value.trim()};LS.set('cfg',this.cfg);this.closeSheet();await this.sync(true)},
