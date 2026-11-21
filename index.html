@@ -132,7 +132,7 @@ a{color:var(--blue)}
 <header>
   <h1>わな猟日誌 <span class="me" id="meName"></span></h1>
   <button class="badge" onclick="App.openMap()" aria-label="地図">🗺 地図</button>
-  <button class="badge" id="syncBadge" onclick="App.sync(true)">…</button>
+  <button class="badge" id="syncBadge" onclick="App.badgeTap()">…</button>
   <button class="badge" onclick="App.openSettings()" aria-label="設定">⚙</button>
 </header>
 <main id="main"></main>
@@ -217,12 +217,25 @@ const App={
     if(!this.cfg.api||!this.cfg.token){this.openSettings();}
     this.locate();
     this.sync();
-    window.addEventListener('online',()=>this.sync());
+    window.addEventListener('online',()=>{this.errKind='';this.lastErr='';this.sync()});
+    window.addEventListener('offline',()=>this.render());
     document.addEventListener('visibilitychange',()=>{if(!document.hidden){this.sync();if(!this.loc||Date.now()-this.loc.time>120000)this.locate()}});
     if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
   },
 
   me(){return this.state?.me?.name||this.cfg.name||''},
+  // 未送信の原因：未接続／圏外／通信（電波）／招待リンク／サーバー（管理者）
+  status(){const n=this.queue.length;
+    if(!this.cfg.api||!this.cfg.token)return {level:'err',badge:'⚠ 未接続',title:'未接続：送り先が設定されていません',msg:`招待リンクを、このスマホのChromeで開き直してください（LINEのリンクを長押し→コピー→Chromeに貼り付け）。${n?`記録${n}件はスマホに残っていて、つながると自動で送られます。`:''}`,retry:false};
+    if(!navigator.onLine||this.errKind==='offline')return n?{level:'warn',badge:'圏外 未送信'+n,title:`圏外のため未送信 ${n}件`,msg:'電波が戻ると自動で送ります。故障ではありません。',retry:false}:{level:'',badge:'圏外',title:'',msg:''};
+    if(this.lastErr&&n){
+      if(this.errKind==='net')return {level:'warn',badge:'⚠ 通信できず '+n,title:`電波・通信の問題で未送信 ${n}件`,msg:this.lastErr+'。電波の良い所で「もう一度送る」を押してください。記録はスマホに残っています。',retry:true};
+      if(this.errKind==='auth')return {level:'err',badge:'⚠ 招待リンク',title:'招待リンクが使えません（システム側）',msg:this.lastErr+'。管理者に新しい招待リンクをもらって開き直してください。記録はスマホに残っています。',retry:false};
+      return {level:'err',badge:'⚠ サーバー '+n,title:`サーバー側の問題で未送信 ${n}件（システム側）`,msg:'内容：'+this.lastErr+'。この画面のスクショを管理者に送ってください。記録はスマホに残っています。',retry:true};
+    }
+    if(n)return {level:'warn',badge:'未送信 '+n,title:'',msg:'',retry:false};
+    return {level:'',badge:'✓ 同期済',title:'',msg:''};
+  },
   prefix(){return this.state?.me?.prefix||(this.me()||'?').charAt(0)},
   settings(){return this.state?.settings||{seasonStart:'2026-11-15',seasonEnd:'2027-03-15',otherEnd:'2027-02-15',deerEnd:'2027-02-28',deerReport:'2027-03-04',checkWarnDays:1,group:''}},
 
@@ -274,12 +287,13 @@ const App={
   render(){
     $('#meName').textContent=this.me()?'・'+this.me():'';
     const b=$('#syncBadge');const n=this.queue.length;
-    b.className='badge'+(this.lastErr?' err':n?' warn':'');
-    b.textContent=this.syncing?(this.syncLabel||'送信中')+'…':this.lastErr?'⚠ 未送信'+n:n?'未送信 '+n:'✓ 同期済';
+    const st=this.status();
+    b.className='badge'+(st.level==='err'?' err':st.level==='warn'?' warn':'');
+    b.textContent=this.syncing?(this.syncLabel||'送信中')+'…':st.badge;
     const s=this.settings(),t=today();
     let h='';
     // 警告
-    if(!this.cfg.api||!this.cfg.token)h+=`<div class="alert red">サーバーの設定がまだです。右上の⚙から設定するか、招待リンクを開いてください。</div>`;
+    if(!this.syncing&&st.msg)h+=`<div class="alert${st.level==='err'?' red':''}"><b>${esc(st.title)}</b><br>${esc(st.msg)}${st.retry?`<br><button class="iconbtn" style="margin-top:6px" onclick="App.sync(true)">もう一度送る</button>`:''}</div>`;
     if(t<s.seasonStart||t>s.seasonEnd)h+=`<div class="alert">今日は猟期外です（猟期 ${md(s.seasonStart)}〜${md(s.seasonEnd)}）。</div>`;
     else if(t>s.otherEnd)h+=`<div class="alert">シカ・イノシシ以外の猟期は ${md(s.otherEnd)} で終了しています。</div>`;
     const late=this.activeTraps().filter(x=>x.owner===this.me()&&x.lastCheck&&daysBetween(x.lastCheck,t)>s.checkWarnDays);
@@ -642,15 +656,21 @@ const App={
     // 写真付きは電波が弱いと時間がかかるので長めに待つ（約1MBごとに+60秒、最大4分）
     const limit=Math.min(240000,30000+Math.ceil(data.length/1e6)*60000);
     const ctl=new AbortController();const tm=setTimeout(()=>ctl.abort(),limit);
-    try{const r=await fetch(this.cfg.api,{method:'POST',body:data,signal:ctl.signal,redirect:'follow'});
-      const txt=await r.text();let j;try{j=JSON.parse(txt)}catch(e){throw new Error(/<html/i.test(txt)?'サーバーが応答しません（Apps Scriptのデプロイ・権限を確認）':'サーバーの応答が読めません')}
-      if(!j.ok)throw new Error(j.error||'サーバーエラー');return j}
-    catch(e){if(e.name==='AbortError')throw new Error('時間切れ（電波の良い所で再送されます）');throw e}
-    finally{clearTimeout(tm)}
+    const fail=(msg,kind)=>{const e=new Error(msg);e.kind=kind;return e};
+    let r,txt;
+    try{r=await fetch(this.cfg.api,{method:'POST',body:data,signal:ctl.signal,redirect:'follow'});txt=await r.text()}
+    catch(e){clearTimeout(tm);
+      if(e.name==='AbortError')throw fail('時間切れ（電波が弱いか、写真が大きい）','net');
+      throw fail(navigator.onLine?'サーバーにつながりません（電波が弱いか、サーバーURLの間違い）':'圏外です',navigator.onLine?'net':'offline')}
+    clearTimeout(tm);
+    let j;try{j=JSON.parse(txt)}catch(e){throw fail(/<html/i.test(txt)?'サーバーが応答しません（Apps Scriptのデプロイ・公開範囲）':'サーバーの応答が読めません','server')}
+    if(!j.ok)throw fail(j.error||'サーバーエラー',/トークン/.test(j.error||'')?'auth':'server');
+    return j
   },
+  badgeTap(){const st=this.status();if(!this.cfg.api||!this.cfg.token)return this.openSettings();if(st.badge.startsWith('圏外'))return toast(st.msg||'圏外です',4000);this.sync(true)},
   async sync(manual){
     if(this.syncing||!this.cfg.api||!this.cfg.token)return;
-    if(!navigator.onLine){if(manual)toast('圏外です。電波が戻ったら自動で送ります');return}
+    if(!navigator.onLine){this.lastErr='圏外です';this.errKind='offline';this.render();if(manual)toast('圏外です。電波が戻ったら自動で送ります');return}
     this.syncing=true;this.syncLabel='';this.render();
     const watchdog=setTimeout(()=>{if(this.syncing){this.syncing=false;this.lastErr='送信が止まりました';this.render()}},300000);
     try{
@@ -668,12 +688,12 @@ const App={
         for(const b of batch){if(ok.has(b.id)){await DB.del(b.id);const {photos,...lite}=b.ev;lite.photoCount=(photos||[]).length;this.history.unshift(lite)}}
         this.history=this.history.slice(0,60);LS.set('history',this.history);
         this.queue=await DB.all();
-        if(!batch.every(b=>ok.has(b.id)))throw new Error('一部が保存されませんでした');
+        if(!batch.every(b=>ok.has(b.id))){const e=new Error('サーバーで一部が保存されませんでした');e.kind='server';throw e}
       }
       if(!res)res=await this.post({action:'state'});
       this.state=res.state;LS.set('state',this.state);
-      this.lastErr='';if(manual)toast('同期しました');
-    }catch(e){this.lastErr=String(e.message||e);if(manual)toast('送信できませんでした：'+this.lastErr,4000)}
+      this.lastErr='';this.errKind='';if(manual)toast('同期しました');
+    }catch(e){this.lastErr=String(e.message||e);this.errKind=e.kind||'server';this.lastTry=Date.now();if(manual)toast(this.status().msg,5000)}
     finally{clearTimeout(watchdog);this.syncing=false;this.syncLabel='';this.render();if(this.map&&$('#mapView').classList.contains('open')&&!this.fixing)this.drawTraps()}
   },
 
@@ -683,7 +703,7 @@ const App={
     <label class="f">サーバーURL（GASウェブアプリ）</label><input type="text" id="cfgApi" value="${esc(this.cfg.api)}" placeholder="https://script.google.com/macros/s/…/exec">
     <label class="f">トークン</label><input type="text" id="cfgToken" value="${esc(this.cfg.token)}">
     <button class="btn" onclick="App.saveSettings()">保存して接続</button>
-    <div class="card" style="margin-top:16px"><div class="small">利用者：${esc(this.me()||'未接続')}・未送信：${this.queue.length}件${this.lastErr?`<br>最後のエラー：${esc(this.lastErr)}`:''}</div></div>
+    <div class="card" style="margin-top:16px"><div class="small">利用者：${esc(this.me()||'未接続')}・未送信：${this.queue.length}件${this.lastErr?`<br>最後のエラー：${esc(this.lastErr)}（${esc({offline:'圏外',net:'電波・通信',auth:'招待リンク',server:'サーバー'}[this.errKind]||'')}）`:''}</div></div>
     <button class="btn sec" onclick="App.exportQueue()">未送信データを書き出す（予備）</button>
     <p class="small">位置図番号は「京都府鳥獣保護区等位置図（令和8年度）」の3桁番号をGPSから計算しています。区画の境界付近では、紙の位置図でも確認してください。</p>`)},
   async saveSettings(){this.cfg={api:$('#cfgApi').value.trim(),token:$('#cfgToken').value.trim()};LS.set('cfg',this.cfg);this.closeSheet();await this.sync(true)},
