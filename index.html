@@ -21,7 +21,8 @@ html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui
 header{position:sticky;top:0;z-index:5;background:var(--green);color:#fff;padding:10px 14px calc(10px) 14px;padding-top:max(10px,env(safe-area-inset-top));display:flex;align-items:center;gap:10px}
 header h1{font-size:17px;margin:0;flex:1;font-weight:700;letter-spacing:.02em;display:flex;align-items:center;gap:8px;min-width:0}
 header h1 .hlogo{width:32px;height:32px;flex:0 0 auto;border-radius:50%}
-header h1 .ttl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header h1 .ttl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;flex-direction:column;line-height:1.15}
+header h1 .ttl .me{font-size:12px;font-weight:600}
 /* 起動画面 */
 #splash{position:fixed;inset:0;z-index:80;background:radial-gradient(circle at 50% 40%,#2a3a24 0,#0e140f 66%);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#e9dcbc;transition:opacity .45s}
 #splash.hide{opacity:0;pointer-events:none}
@@ -41,6 +42,16 @@ header h1 .ttl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #notice .btns{display:flex;flex-direction:column;gap:8px;padding:12px 18px 18px}
 .manualbtn{display:block;text-align:center;text-decoration:none}
 header .me{font-size:13px;opacity:.85}
+.badge.sos{background:#c62828;font-weight:800;letter-spacing:.04em}
+#mapView .bar button.sos{background:#c62828;font-weight:800}
+.sosbox{background:#fff;border:2px solid #c62828;border-radius:14px;padding:12px;margin-bottom:12px}
+.sosbox .big{font-size:22px;font-weight:800;letter-spacing:.02em}
+.btn.red{background:#c62828}
+.btn.sosbig{background:#c62828;font-size:20px;padding:18px 12px;margin-top:18px;box-shadow:0 3px 10px rgba(198,40,40,.35)}
+.btn.sosbig small{display:block;font-size:13px;font-weight:600;opacity:.9;margin-top:2px}
+.sosguide{background:#fff6f5;border-radius:12px;padding:10px 12px;font-size:14px;margin-top:12px}
+.sosguide b{color:#a01f1f}
+.ctc{display:flex;gap:8px;align-items:center;margin-top:8px}.ctc input{flex:1}.ctc button{flex:0 0 auto}
 .badge{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;font-size:13px;background:rgba(255,255,255,.15);border:0;color:#fff}
 .badge.warn{background:var(--yellow);color:#3a2a00}
 .badge.err{background:#ffd9d6;color:var(--red)}
@@ -159,7 +170,7 @@ a{color:var(--blue)}
 </head>
 <body>
 <header>
-  <h1><img class="hlogo" src="logo-s.webp" alt=""><span class="ttl">わな猟日誌 <span class="me" id="meName"></span></span></h1>
+  <h1><img class="hlogo" src="logo-s.webp" alt=""><span class="ttl">わな猟日誌<span class="me" id="meName"></span></span></h1>
   <button class="badge" onclick="App.openMap()" aria-label="地図">🗺 地図</button>
   <button class="badge" id="syncBadge" onclick="App.badgeTap()">…</button>
   <button class="badge" onclick="App.openSettings()" aria-label="設定">⚙</button>
@@ -171,7 +182,7 @@ a{color:var(--blue)}
 <div class="sheet" id="sheet"><div class="hd"><h3 id="sheetTitle"></h3><button class="iconbtn" onclick="App.closeSheet()">閉じる</button></div><div class="bd" id="sheetBody"></div></div>
 <div id="mapView"><div class="bar"><button onclick="App.closeMap()">← 戻る</button><b></b>
   <button id="bStd" class="on" onclick="App.setBase('std')">地図</button><button id="bPhoto" onclick="App.setBase('photo')">写真</button>
-  <button id="bGrid" class="on" onclick="App.toggleGrid()">区画</button><button id="bOld" onclick="App.toggleRemoved()">撤去済</button><button id="bNote" class="on" onclick="App.toggleNotes()">📝メモ</button><button onclick="App.mapToMe()">現在地</button></div>
+  <button id="bGrid" class="on" onclick="App.toggleGrid()">区画</button><button id="bOld" onclick="App.toggleRemoved()">撤去済</button><button id="bNote" class="on" onclick="App.toggleNotes()">📝メモ</button><button onclick="App.mapToMe()">現在地</button><button class="sos" onclick="App.openSOS()">SOS</button></div>
   <div id="mapWrap"><div id="map"></div>
   <svg id="crosshair" viewBox="0 0 44 44"><circle cx="22" cy="22" r="9" fill="none" stroke="#c8611d" stroke-width="3"/><path d="M22 0v13M22 31v13M0 22h13M31 22h13" stroke="#c8611d" stroke-width="3"/></svg>
   <div id="fixPanel"></div></div></div>
@@ -194,10 +205,13 @@ const MUNI={'26101':'京都市北区','26102':'京都市上京区','26103':'京�
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad=n=>String(n).padStart(2,'0');
-const APP_VER='3.9.2';
+const distM=(a,b,c,d)=>{const R=6371000,r=Math.PI/180,x=(d-b)*r*Math.cos((a+c)/2*r),y=(c-a)*r;return Math.sqrt(x*x+y*y)*R};
+const APP_VER='3.10.1';
 // マニュアル（PDF）はGoogleドライブに置き、サーバー経由で招待リンクを持つ人だけが開ける
 // 更新のお知らせ（新しい版を上に足していく）
 const CHANGELOG={
+  '3.10.1':['SOSボタンをホーム画面のいちばん下（マニュアルの下）の大きいボタンに移動。右上には名前が見えるように戻しました'],
+  '3.10':['「SOS」ボタンを追加。現在地入りのSMSを登録した相手に送れる（相手は⚙で各自が登録）','SOS画面に、119・110への電話と、圏外のときの連絡方法の案内'],
   '3.9.2':['設置・捕獲・撤去・メモでも、その場の天候・気温を自動で記録（入力は不要）'],
   '3.9.1':['「写真をスマホに保存」のファイル名を記録ごとに変えて、上書きの確認が出ないように'],
   '3.9':['記録をタップして、修正・削除できるように（写真の差し替えも）','下調べのメモを地図に表示（📝）。メモの場所から罠の設置もできる','「すべての記録を見る」を追加'],
@@ -337,7 +351,7 @@ const App={
 
   // ---------- 描画 ----------
   render(){
-    $('#meName').textContent=this.me()?'・'+this.me():'';
+    $('#meName').textContent=this.me()?this.me()+' さん':'';
     const b=$('#syncBadge');const n=this.queue.length;
     const st=this.status();
     b.className='badge'+(st.level==='err'?' err':st.level==='warn'?' warn':'');
@@ -394,7 +408,8 @@ const App={
     if(!recs){h+=`<h2><span>最近の記録</span></h2><div class="card">`;
     if(!recent.length)h+=`<div class="empty">まだ記録がありません</div>`;}
     for(const e of recent){h+=`<div class="log"><div class="t">${md(e.date)} ${esc(e.time||'')}</div><div>${e.pending?'<span class="tag pending">未送信</span>':''}<b>${TYPE_JA[e.type]}</b> ${esc(e.trapId||'')} ${esc(e.species||'')}${e.type==='catch'?` ♂${e.male||0} ♀${e.female||0}${+e.unknown?' 不明'+e.unknown:''}`:''} ${esc(e.checkResult&&e.checkResult!=='異常なし'?e.checkResult:'')} <span class="small">${esc(e.mesh||'')}${e.byName&&e.byName!==this.me()?'・'+esc(e.byName):''}</span></div></div>`}
-    h+=`${recs?'':'</div>'}<button class="btn sec" style="margin-top:14px" onclick="App.openManual()">📖 使い方マニュアル${this.state?.manual?.ver?' v'+esc(this.state.manual.ver):''}（PDF）</button><p class="small" style="text-align:center">データはスプレッドシートに保存され、PCで編集できます。<br>わな猟日誌 アプリ v${APP_VER}${this.state?.serverVer?`・サーバー v${esc(this.state.serverVer)}`:''}</p>`;
+    h+=`${recs?'':'</div>'}<button class="btn sec" style="margin-top:14px" onclick="App.openManual()">📖 使い方マニュアル${this.state?.manual?.ver?' v'+esc(this.state.manual.ver):''}（PDF）</button>
+      <button class="btn sosbig" onclick="App.openSOS()">🆘 緊急SOS<small>現在地を表示・SMSで知らせる・119／110</small></button><p class="small" style="text-align:center">データはスプレッドシートに保存され、PCで編集できます。<br>わな猟日誌 アプリ v${APP_VER}${this.state?.serverVer?`・サーバー v${esc(this.state.serverVer)}`:''}</p>`;
     $('#main').innerHTML=h;
   },
 
@@ -938,10 +953,60 @@ const App={
     <button class="btn" onclick="App.saveSettings()">保存して接続</button>
     <label class="checkrow" style="margin-top:14px"><input type="checkbox" id="cfgSavePhotos" ${this.savePhotosOn()?'checked':''} onchange="LS.set('savePhotos',this.checked);toast(this.checked?'撮った写真をスマホにも保存します':'スマホへの保存をやめました')"><span>アプリで撮った写真をスマホにも保存する（「ダウンロード」フォルダ）</span></label>
     <div class="hint">2枚目から保存されないときは、Chromeが「複数のファイルのダウンロード」を止めています。Chrome右上の︙ → 設定 → サイトの設定 → 自動ダウンロード で、このアプリのサイトを「許可」にしてください。画面の下に「このサイトに複数のファイルのダウンロードを許可しますか？」と出たときは「許可」を押します。</div>
+    <label class="f" style="margin-top:18px">SOSの連絡先（このスマホだけに保存）</label>
+    <div class="small">「SOS」ボタンで現在地入りのSMSを送る相手です。携帯電話の番号を入れてください（固定電話にはSMSが届きません）。サーバーには送りません。</div>
+    <div id="sosCtc">${this.sosContacts().map((c,i)=>`<div class="ctc"><input type="text" data-ci="${i}" data-k="name" value="${esc(c.name)}" placeholder="名前（例：中村）" style="max-width:38%"><input type="tel" data-ci="${i}" data-k="tel" value="${esc(c.tel)}" placeholder="090-1234-5678"><button class="iconbtn" type="button" onclick="App.delSosContact(${i})">削除</button></div>`).join('')}</div>
+    <div class="row"><button class="btn sec" type="button" onclick="App.addSosContact()">＋ 連絡先を追加</button><button class="btn" type="button" onclick="App.saveSosContacts()">連絡先を保存</button></div>
     <div class="card" style="margin-top:16px"><div class="small">利用者：${esc(this.me()||'未接続')}・未送信：${this.queue.length}件<br>アプリ v${APP_VER}・サーバー ${this.state?.serverVer?'v'+esc(this.state.serverVer):'（確認できず）'}${this.lastErr?`<br>最後のエラー：${esc(this.lastErr)}（${esc({offline:'圏外',net:'電波・通信',auth:'招待リンク',server:'サーバー'}[this.errKind]||'')}）`:''}</div></div>
     <button class="btn sec" onclick="App.openManual()">📖 使い方マニュアル${this.state?.manual?.ver?' v'+esc(this.state.manual.ver):''}（PDF）</button>
     <button class="btn sec" onclick="App.exportQueue()">未送信データを書き出す（予備）</button>
     <p class="small">位置図番号は「京都府鳥獣保護区等位置図（令和8年度）」の3桁番号をGPSから計算しています。区画の境界付近では、紙の位置図でも確認してください。</p>`)},
+  // ---------- SOS ----------
+  sosContacts(){return LS.get('sosContacts',[])},
+  readSosContacts(){const out=[];document.querySelectorAll('#sosCtc .ctc').forEach(r=>{const n=r.querySelector('[data-k=name]').value.trim(),t=r.querySelector('[data-k=tel]').value.trim();out.push({name:n,tel:t})});return out},
+  addSosContact(){const c=this.readSosContacts();c.push({name:'',tel:''});LS.set('sosContacts',c);this.openSettings();setTimeout(()=>{const el=[...document.querySelectorAll('#sosCtc [data-k=name]')].pop();el?.scrollIntoView({block:'center'});el?.focus()},100)},
+  delSosContact(i){const c=this.readSosContacts();c.splice(i,1);LS.set('sosContacts',c);this.openSettings();toast('削除しました')},
+  saveSosContacts(){const c=this.readSosContacts().filter(x=>x.name||x.tel);
+    for(const x of c){const d=x.tel.replace(/[^\d+]/g,'');if(d.replace('+','').length<10)return toast(`${x.name||'連絡先'}の番号を確かめてください`,4000);x.tel=d}
+    LS.set('sosContacts',c);this.openSettings();toast(c.length?`SOSの連絡先を${c.length}件保存しました`:'連絡先を空にしました')},
+  nearestTrap(){const l=this.loc;if(!l)return null;let best=null;
+    for(const t of this.activeTraps()){if(!t.lat||!t.lon)continue;const d=distM(l.lat,l.lon,+t.lat,+t.lon);if(!best||d<best.d)best={t,d}}return best},
+  sosText(){const l=this.loc,p=this.placeNow(),f=this.form,n=this.nearestTrap();const now=new Date();
+    const hm=d=>`${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const lines=[`【SOS わな猟】${this.me()||''}`,`${now.getMonth()+1}/${now.getDate()} ${hm(now)} 発信`];
+    if(f.sosWhat)lines.push(`状況：${f.sosWhat}`);
+    if(l){lines.push(`場所：${p?(p.city||'')+(p.oaza||''):''} 位置図${l.mesh||'府外'}（±${l.acc}m・${hm(new Date(l.time))}測位）`);
+      if(n)lines.push(`近くの罠：${n.t.id}（約${n.d<1000?Math.round(n.d)+'m':(n.d/1000).toFixed(1)+'km'}）`);
+      lines.push(`地図：https://maps.google.com/?q=${l.lat},${l.lon}`,`緯度経度：${l.lat},${l.lon}`)}
+    else lines.push('現在地が取れていません。'+(this.place?`最後の場所：${this.place.city||''}${this.place.oaza||''}`:''));
+    lines.push('（わな猟日誌アプリから送信）');return lines.join('\n')},
+  openSOS(){this.closeMap?.();if(!this.loc||Date.now()-this.loc.time>60000)this.locate();
+    const keep=this.form?.sosWhat;this.form={sos:true,sosWhat:keep||'',useLoc:true,render:()=>{const f=this.form,l=this.loc,p=this.placeNow(),n=this.nearestTrap(),cs=this.sosContacts().filter(c=>c.tel);
+      const age=l?Math.round((Date.now()-l.time)/60000):null;
+      this.openSheet('🆘 緊急SOS',`<div class="sosbox">
+        ${l?`<div class="small">今いる場所（${age<1?'いま':age+'分前に'}測位・誤差±${l.acc}m）${this.locating?' 測位中…':''}</div>
+          <div class="big">位置図 ${esc(l.mesh||'府外')}　${esc(p?(p.city||'')+(p.oaza||''):'')}</div>
+          <div style="font-size:18px;font-weight:700">緯度 ${l.lat}　経度 ${l.lon}</div>
+          ${n?`<div class="small">近くの罠：${esc(n.t.id)}（約${n.d<1000?Math.round(n.d)+'m':(n.d/1000).toFixed(1)+'km'}）</div>`:''}`
+          :`<div class="big">${this.locating?'現在地を測位中…':'現在地が取れていません'}</div><div class="small">${esc(this.locErr||'空の見える所で少し待ってください')}</div>`}
+        <button class="btn sec" style="margin-top:8px" onclick="App.readInputs();App.locate()">現在地を取り直す</button></div>
+      <label class="f">状況（任意・選ぶか書く）</label>${this.chipHtml('sosWhat',['ケガをして動けない','道に迷った','獣に襲われた','体調が悪い','至急連絡がほしい'],f.sosWhat)}
+      <input type="text" data-f="sosWhat" oninput="App.form.sosWhat=this.value" value="${esc(f.sosWhat||'')}" placeholder="例：右足を骨折、沢沿いにいる" style="margin-top:8px">
+      ${cs.length?`<button class="btn red" style="margin-top:14px" onclick="App.sendSOS()">📩 ${esc(cs.map(c=>c.name||c.tel).join('・'))} にSMSで知らせる</button>`
+        :`<div class="alert" style="margin-top:14px">SMSを送る相手が登録されていません。⚙の「SOSの連絡先」で登録してください。</div><button class="btn sec" onclick="App.openSettings()">連絡先を登録する</button>`}
+      <div class="row"><a class="btn red" style="display:block;text-align:center;text-decoration:none" href="tel:119">📞 119（救急・消防）</a><a class="btn red" style="display:block;text-align:center;text-decoration:none" href="tel:110">📞 110（警察）</a></div>
+      <div class="sosguide"><b>電波があるとき</b>：119／110に電話し、上の位置図番号・緯度経度を読み上げてください。<br>
+        <b>圏外のとき</b>：SMSは電波のある所に出るまで送れません。少し高い所・開けた所へ移動して、メッセージアプリで再送してください。<br>
+        <b>auで「SpaceX-au」等と出ているとき（Starlink）</b>：SMSは送れます。警察・消防へは「auナビウォーク」など対応アプリの「衛星SOS」から通報できます（電話はできません）。<br>
+        <b>位置は電波がなくてもGPSで出ます。</b>電話がつながったら、この画面の数字を伝えてください。</div>`)}};this.renderForm()},
+  goUrl(u){location.href=u},
+  async sendSOS(){this.readInputs();const cs=this.sosContacts().filter(c=>c.tel);if(!cs.length)return;
+    const body=this.sosText();
+    // Android の sms: は複数宛先をカンマで区切る
+    this.goUrl(`sms:${cs.map(c=>c.tel).join(',')}?body=${encodeURIComponent(body)}`);
+    // チームにも残す（電波が戻ったときに記録として届く）
+    try{const l=this.loc;await this.enqueue({...this.baseEvent('note'),memo:'🆘 SOSを発信（'+cs.map(c=>c.name||c.tel).join('・')+'へSMS）'+(this.form.sosWhat?'：'+this.form.sosWhat:''),photos:[]})}catch(e){}
+  },
   async saveSettings(){this.cfg={api:$('#cfgApi').value.trim(),token:$('#cfgToken').value.trim()};LS.set('cfg',this.cfg);this.closeSheet();await this.sync(true)},
   async exportQueue(){const q=await DB.all();const blob=new Blob([JSON.stringify(q.map(x=>x.ev),null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='wanalog_unsent_'+today()+'.json';a.click()}
 };
