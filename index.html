@@ -194,10 +194,11 @@ const MUNI={'26101':'京都市北区','26102':'京都市上京区','26103':'京�
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad=n=>String(n).padStart(2,'0');
-const APP_VER='3.9.1';
+const APP_VER='3.9.2';
 // マニュアル（PDF）はGoogleドライブに置き、サーバー経由で招待リンクを持つ人だけが開ける
 // 更新のお知らせ（新しい版を上に足していく）
 const CHANGELOG={
+  '3.9.2':['設置・捕獲・撤去・メモでも、その場の天候・気温を自動で記録（入力は不要）'],
   '3.9.1':['「写真をスマホに保存」のファイル名を記録ごとに変えて、上書きの確認が出ないように'],
   '3.9':['記録をタップして、修正・削除できるように（写真の差し替えも）','下調べのメモを地図に表示（📝）。メモの場所から罠の設置もできる','「すべての記録を見る」を追加'],
   '3.8':['起動画面を新しいロゴ（TRAP HUNTER MAP）に','マニュアル（PDF）をGoogleドライブから開くように（招待リンクを持つ人だけ）'],
@@ -422,11 +423,13 @@ const App={
   dateBlock(){return `<div class="row"><div><label class="f">日付</label><input type="date" data-f="date" value="${esc(this.form.date||today())}"></div><div><label class="f">時刻</label><input type="time" data-f="time" value="${esc(this.form.time||nowTime())}"></div></div>`},
   weatherBlock(){const f=this.form;if(f.weather===undefined&&this.weather){f.weather=this.weather.w;f.temp=this.weather.temp}
     return `<label class="f">天候・気温</label>${this.chipHtml('weather',WEATHERS,f.weather)}<div class="row" style="margin-top:8px"><input type="number" inputmode="numeric" data-f="temp" value="${esc(f.temp??'')}" placeholder="気温 ℃"></div>`},
+  // 天候・気温：入力があればそれ、なければその場の天気（Open-Meteo）を自動で入れる（圏外で取れなければ空欄）
+  autoWeather(){const f=this.form,w=this.weather;return {weather:f.weather||w?.w||'',temp:(f.temp!==undefined&&f.temp!=='')?f.temp:(w?.temp??'')}},
   baseEvent(type){const f=this.form;
-    if(f.preset){const q=f.preset;return {id:uid(),type,date:f.date||today(),time:f.time||nowTime(),lat:q.lat,lon:q.lon,acc:q.acc||'',mesh:(f.meshOverride||'').trim()||q.mesh||meshOf(+q.lat,+q.lon)||'',city:q.city||'',oaza:q.oaza||'',weather:f.weather||'',temp:f.temp??'',memo:f.memo||'',byName:this.me()}}
+    if(f.preset){const q=f.preset;return {id:uid(),type,date:f.date||today(),time:f.time||nowTime(),lat:q.lat,lon:q.lon,acc:q.acc||'',mesh:(f.meshOverride||'').trim()||q.mesh||meshOf(+q.lat,+q.lon)||'',city:q.city||'',oaza:q.oaza||'',...this.autoWeather(),memo:f.memo||'',byName:this.me()}}
     const l=this.loc,p=this.placeNow();
     return {id:uid(),type,date:f.date||today(),time:f.time||nowTime(),lat:l?.lat||'',lon:l?.lon||'',acc:l?.acc||'',
-      mesh:(f.meshOverride||'').trim()||l?.mesh||'',city:p?.city||'',oaza:p?.oaza||'',weather:f.weather||'',temp:f.temp??'',memo:f.memo||'',byName:this.me()}},
+      mesh:(f.meshOverride||'').trim()||l?.mesh||'',city:p?.city||'',oaza:p?.oaza||'',...this.autoWeather(),memo:f.memo||'',byName:this.me()}},
 
   // 罠を設置
   nextId(type){const tt=TRAP_TYPES.find(x=>x.v===type)||TRAP_TYPES[0];const pre=this.prefix()+tt.l+'-';let max=0;for(const t of this.traps()){if(t.id.startsWith(pre)){const n=parseInt(t.id.slice(pre.length));if(n>max)max=n}}return pre+pad(max+1)},
