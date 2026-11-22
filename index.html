@@ -72,6 +72,15 @@ h2{font-size:15px;margin:18px 4px 8px;color:var(--sub);font-weight:700;display:f
 .empty{color:var(--sub);font-size:14px;padding:6px 4px}
 .log{font-size:13px;padding:8px 4px;border-bottom:1px solid var(--line);display:flex;gap:8px}
 .log .t{color:var(--sub);min-width:84px}
+.log.tap{cursor:pointer}.log.tap:active{background:#f0f3f0}
+.log .go{margin-left:auto;color:var(--sub);align-self:center}
+.tag.cam{white-space:nowrap}
+.eph{position:relative;display:inline-block}.eph img{width:84px;height:84px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+.eph.rm img{opacity:.3}.eph .x{position:absolute;top:-6px;right:-6px;width:26px;height:26px;border-radius:50%;border:0;background:#b3261e;color:#fff;font-weight:800}
+.eph.rm .x{background:#555}.eph.rm::after{content:'外す';position:absolute;left:0;right:0;top:32px;text-align:center;font-weight:800;color:#b3261e}
+.note-pin{font-size:20px;line-height:26px;width:28px;height:28px;text-align:center;background:#fff3c4;border:2px solid #7a5a2f;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.35)}
+.btn.danger{background:#fff;color:#b3261e;border:1px solid #b3261e}
+.preset{background:#fff3c4;border-radius:10px;padding:8px 10px;margin-top:6px;font-size:14px}
 .deer .bar{height:10px;background:#eee;border-radius:6px;overflow:hidden;margin:8px 0}
 .deer .bar i{display:block;height:100%;background:var(--orange)}
 .small{font-size:12px;color:var(--sub)}
@@ -162,7 +171,7 @@ a{color:var(--blue)}
 <div class="sheet" id="sheet"><div class="hd"><h3 id="sheetTitle"></h3><button class="iconbtn" onclick="App.closeSheet()">閉じる</button></div><div class="bd" id="sheetBody"></div></div>
 <div id="mapView"><div class="bar"><button onclick="App.closeMap()">← 戻る</button><b></b>
   <button id="bStd" class="on" onclick="App.setBase('std')">地図</button><button id="bPhoto" onclick="App.setBase('photo')">写真</button>
-  <button id="bGrid" class="on" onclick="App.toggleGrid()">区画</button><button id="bOld" onclick="App.toggleRemoved()">撤去済</button><button onclick="App.mapToMe()">現在地</button></div>
+  <button id="bGrid" class="on" onclick="App.toggleGrid()">区画</button><button id="bOld" onclick="App.toggleRemoved()">撤去済</button><button id="bNote" class="on" onclick="App.toggleNotes()">📝メモ</button><button onclick="App.mapToMe()">現在地</button></div>
   <div id="mapWrap"><div id="map"></div>
   <svg id="crosshair" viewBox="0 0 44 44"><circle cx="22" cy="22" r="9" fill="none" stroke="#c8611d" stroke-width="3"/><path d="M22 0v13M22 31v13M0 22h13M31 22h13" stroke="#c8611d" stroke-width="3"/></svg>
   <div id="fixPanel"></div></div></div>
@@ -185,10 +194,11 @@ const MUNI={'26101':'京都市北区','26102':'京都市上京区','26103':'京�
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad=n=>String(n).padStart(2,'0');
-const APP_VER='3.8';
+const APP_VER='3.9';
 // マニュアル（PDF）はGoogleドライブに置き、サーバー経由で招待リンクを持つ人だけが開ける
 // 更新のお知らせ（新しい版を上に足していく）
 const CHANGELOG={
+  '3.9':['記録をタップして、修正・削除できるように（写真の差し替えも）','下調べのメモを地図に表示（📝）。メモの場所から罠の設置もできる','「すべての記録を見る」を追加'],
   '3.8':['起動画面を新しいロゴ（TRAP HUNTER MAP）に','マニュアル（PDF）をGoogleドライブから開くように（招待リンクを持つ人だけ）'],
   '3.7':['起動画面とロゴを追加','アプリを更新したときに、このお知らせを表示','アプリからマニュアル（PDF）を開けるように（ホーム画面の下・⚙）'],
   '3.6':['ホーム画面の下と⚙に、アプリ・サーバーの版を表示'],
@@ -228,7 +238,7 @@ const SPECIES=['ニホンジカ','イノシシ','アナグマ','アライグマ'
 const DISPOSAL=['食肉加工施設','自家消費','埋設','保管庫'];
 const CHECK_RESULTS=['異常なし','空はじき','掛け直し','破損・要修理','錯誤捕獲（放獣）'];
 const WEATHERS=['晴れ','曇り','雨','雪','霧'];
-const TYPE_JA={set:'設置',check:'見回り',catch:'捕獲',remove:'撤去',note:'メモ',fix:'位置補正',photo:'写真追加',edit:'情報修正'};
+const TYPE_JA={set:'設置',check:'見回り',catch:'捕獲',remove:'撤去',note:'メモ',fix:'位置補正',photo:'写真追加',edit:'情報修正',recEdit:'記録修正',recDel:'記録削除'};
 const KIND_EN={'設置':'set','見回り':'check','捕獲':'catch','撤去':'remove','メモ':'note','位置補正':'fix','写真追加':'photo','情報修正':'edit'};
 const NOIMG='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10" fill="#e8ebe8"/></svg>');
 const typeCls=t=>(TRAP_TYPES.find(x=>t&&t.indexOf(x.v.slice(0,2))===0)||{c:''}).c;
@@ -248,10 +258,10 @@ const App={
     const q=new URLSearchParams(location.search);
     if(q.get('api')&&q.get('token')){this.cfg={api:q.get('api'),token:q.get('token')};LS.set('cfg',this.cfg);history.replaceState(null,'',location.pathname);toast('設定を読み込みました')}
     {const mv=LS.get('state',null)?.manual?.ver;$('#splashVer').textContent='アプリ v'+APP_VER+(mv?'　マニュアル v'+mv:'')}
-    setTimeout(()=>$('#splash').classList.add('hide'),2300);
+    setTimeout(()=>$('#splash').classList.add('hide'),1300);
     this.queue=await DB.all();
     this.render();
-    setTimeout(()=>this.checkUpdateNotice(),2400);
+    setTimeout(()=>this.checkUpdateNotice(),1400);
     if(!this.cfg.api||!this.cfg.token){this.openSettings();}
     this.locate();
     this.sync();
@@ -282,6 +292,8 @@ const App={
     const m=new Map();
     for(const t of (this.state?.traps||[]))m.set(t.id,{...t});
     for(const q of this.queue){const e=q.ev;
+      if(e.type==='recDel'){if(e.kind==='set')m.delete(e.trapId);else if(e.kind==='remove'&&m.has(e.trapId)){const t=m.get(e.trapId);t.status='稼働中';t.removeDate='';t.pending=true}continue}
+      if(e.type==='recEdit'){if(e.kind==='set'&&e.fields?.memo!=null&&m.has(e.trapId))m.get(e.trapId).memo=e.fields.memo;continue}
       if(e.type==='set'){m.set(e.trapId,{id:e.trapId,type:e.trapType,owner:e.owner||this.me(),status:'稼働中',setDate:e.date,mesh:e.mesh,city:e.city,oaza:e.oaza,lat:e.lat,lon:e.lon,memo:e.memo,lastCheck:e.date,catches:0,pending:true})}
       else if(m.has(e.trapId)){const t=m.get(e.trapId);
         if(e.type==='check'||e.type==='catch'){if(!t.lastCheck||e.date>t.lastCheck)t.lastCheck=e.date;t.pending=true}
@@ -370,11 +382,17 @@ const App={
       <div class="small">${deer.eligible?`奨励金見込 ${deer.amount.toLocaleString()}円`:`あと ${deer.min-deer.total} 頭で支給対象`}・完了報告期限 ${md(s.deerReport)}</div>
       ${t>s.deerEnd?'<div class="small" style="color:var(--red)">対象期間は終了しました（3/1以降の捕獲は対象外）</div>':''}</div>`}
     // 履歴
-    const recent=[...this.queue.map(q=>({...q.ev,pending:true})).reverse(),...this.history].slice(0,15);
-    h+=`<h2><span>最近の記録</span></h2><div class="card">`;
-    if(!recent.length)h+=`<div class="empty">まだ記録がありません</div>`;
+    const recs=this.records();
+    if(recs){h+=`<h2><span>最近の記録</span><span class="small">タップで詳細・修正</span></h2><div class="card">`;
+      if(!recs.length)h+=`<div class="empty">まだ記録がありません</div>`;
+      h+=recs.slice(0,15).map(r=>this.recRow(r)).join('');
+      if(recs.length>15)h+=`<button class="btn sec" style="margin-top:10px" onclick="App.recList()">すべての記録を見る（${recs.length}件）</button>`;
+      h+=`</div>`}
+    const recent=recs?[]:[...this.queue.map(q=>({...q.ev,pending:true})).reverse(),...this.history].slice(0,15);
+    if(!recs){h+=`<h2><span>最近の記録</span></h2><div class="card">`;
+    if(!recent.length)h+=`<div class="empty">まだ記録がありません</div>`;}
     for(const e of recent){h+=`<div class="log"><div class="t">${md(e.date)} ${esc(e.time||'')}</div><div>${e.pending?'<span class="tag pending">未送信</span>':''}<b>${TYPE_JA[e.type]}</b> ${esc(e.trapId||'')} ${esc(e.species||'')}${e.type==='catch'?` ♂${e.male||0} ♀${e.female||0}${+e.unknown?' 不明'+e.unknown:''}`:''} ${esc(e.checkResult&&e.checkResult!=='異常なし'?e.checkResult:'')} <span class="small">${esc(e.mesh||'')}${e.byName&&e.byName!==this.me()?'・'+esc(e.byName):''}</span></div></div>`}
-    h+=`</div><button class="btn sec" style="margin-top:14px" onclick="App.openManual()">📖 使い方マニュアル${this.state?.manual?.ver?' v'+esc(this.state.manual.ver):''}（PDF）</button><p class="small" style="text-align:center">データはスプレッドシートに保存され、PCで編集できます。<br>わな猟日誌 アプリ v${APP_VER}${this.state?.serverVer?`・サーバー v${esc(this.state.serverVer)}`:''}</p>`;
+    h+=`${recs?'':'</div>'}<button class="btn sec" style="margin-top:14px" onclick="App.openManual()">📖 使い方マニュアル${this.state?.manual?.ver?' v'+esc(this.state.manual.ver):''}（PDF）</button><p class="small" style="text-align:center">データはスプレッドシートに保存され、PCで編集できます。<br>わな猟日誌 アプリ v${APP_VER}${this.state?.serverVer?`・サーバー v${esc(this.state.serverVer)}`:''}</p>`;
     $('#main').innerHTML=h;
   },
 
@@ -387,6 +405,10 @@ const App={
   readInputs(){$('#sheetBody').querySelectorAll('[data-f]').forEach(el=>{this.form[el.dataset.f]=el.type==='checkbox'?el.checked:el.value})},
   locBlock(){
     const l=this.loc,p=this.placeNow(),f=this.form;
+    if(f.preset){const q=f.preset;return `<label class="f">場所</label><div class="card" style="margin:0"><div class="loc"><div class="mesh"><div class="l">位置図番号</div><div class="n">${esc(q.mesh||'---')}</div></div>
+      <div class="place"><div class="p1">${esc((q.city||'')+(q.oaza||''))||'住所は送信時に自動入力'}</div><div class="p2">下調べメモの位置</div></div>
+      <button class="iconbtn" type="button" onclick="App.readInputs();App.form.preset=null;App.locate();App.renderForm()">現在地にする</button></div>
+      <div class="preset">📝 下調べメモ（${md(q.date)}）の場所を使っています。罠を少し離れた所に掛けたときは「現在地にする」を押してください。</div></div>`}
     const mesh=f.meshOverride||(l&&l.mesh)||'';
     return `<label class="f">場所（GPS）</label><div class="card" style="margin:0"><div class="loc"><div class="mesh"><div class="l">位置図番号</div><div class="n">${esc(mesh||'---')}</div></div>
       <div class="place"><div class="p1">${p?esc((p.city||'')+(p.oaza||'')):'住所は送信時に自動入力'}</div><div class="p2">${l?`±${l.acc}m`:'位置未取得'}${this.locating?' 測位中…':''}</div></div>
@@ -399,14 +421,16 @@ const App={
   dateBlock(){return `<div class="row"><div><label class="f">日付</label><input type="date" data-f="date" value="${esc(this.form.date||today())}"></div><div><label class="f">時刻</label><input type="time" data-f="time" value="${esc(this.form.time||nowTime())}"></div></div>`},
   weatherBlock(){const f=this.form;if(f.weather===undefined&&this.weather){f.weather=this.weather.w;f.temp=this.weather.temp}
     return `<label class="f">天候・気温</label>${this.chipHtml('weather',WEATHERS,f.weather)}<div class="row" style="margin-top:8px"><input type="number" inputmode="numeric" data-f="temp" value="${esc(f.temp??'')}" placeholder="気温 ℃"></div>`},
-  baseEvent(type){const l=this.loc,p=this.placeNow(),f=this.form;
+  baseEvent(type){const f=this.form;
+    if(f.preset){const q=f.preset;return {id:uid(),type,date:f.date||today(),time:f.time||nowTime(),lat:q.lat,lon:q.lon,acc:q.acc||'',mesh:(f.meshOverride||'').trim()||q.mesh||meshOf(+q.lat,+q.lon)||'',city:q.city||'',oaza:q.oaza||'',weather:f.weather||'',temp:f.temp??'',memo:f.memo||'',byName:this.me()}}
+    const l=this.loc,p=this.placeNow();
     return {id:uid(),type,date:f.date||today(),time:f.time||nowTime(),lat:l?.lat||'',lon:l?.lon||'',acc:l?.acc||'',
       mesh:(f.meshOverride||'').trim()||l?.mesh||'',city:p?.city||'',oaza:p?.oaza||'',weather:f.weather||'',temp:f.temp??'',memo:f.memo||'',byName:this.me()}},
 
   // 罠を設置
   nextId(type){const tt=TRAP_TYPES.find(x=>x.v===type)||TRAP_TYPES[0];const pre=this.prefix()+tt.l+'-';let max=0;for(const t of this.traps()){if(t.id.startsWith(pre)){const n=parseInt(t.id.slice(pre.length));if(n>max)max=n}}return pre+pad(max+1)},
-  formSet(){
-    this.form={useLoc:true,trapType:'くくりわな',owner:this.me(),render:()=>{const f=this.form;if(!f.idEdited)f.trapId=this.nextId(f.trapType);
+  formSet(preset){
+    this.form={useLoc:true,trapType:'くくりわな',owner:this.me(),preset:preset||null,memo:preset?.memo||'',render:()=>{const f=this.form;if(!f.idEdited)f.trapId=this.nextId(f.trapType);
       this.openSheet('罠を設置',`
       <label class="f">わなの種類</label>${this.chipHtml('trapType',TRAP_TYPES.map(x=>x.v),f.trapType)}
       <div class="row"><div><label class="f">罠ID</label><input type="text" data-f="trapId" value="${esc(f.trapId)}" oninput="App.form.idEdited=true"></div>
@@ -420,7 +444,7 @@ const App={
   },
   async saveSet(){this.readInputs();const f=this.form;
     if(!f.trapId)return toast('罠IDを入れてください');
-    if(!this.loc&&!f.meshOverride)return toast('位置が取れていません。再取得するか番号を手入力してください');
+    if(!this.loc&&!f.meshOverride&&!f.preset)return toast('位置が取れていません。再取得するか番号を手入力してください');
     const dup=this.activeTraps().find(t=>t.id===f.trapId);
     if(dup&&!confirm(`${f.trapId} は稼働中です。移設として場所を更新しますか？`))return;
     const mine=this.activeTraps().filter(t=>t.owner===f.owner).length+(dup?0:1);
@@ -530,7 +554,8 @@ const App={
   // サーバーの写真（設置・見回り・捕獲・写真追加）＋未送信の写真。新しい順
   trapPhotos(id){
     const t=(this.state?.traps||[]).find(x=>x.id===id);
-    const out=(t?.photos||[]).map(p=>({...p,kind:KIND_EN[p.kind]||p.kind}));
+    const gone=this.gonePhotos();
+    const out=(t?.photos||[]).filter(p=>!gone.has(p.id)).map(p=>({...p,kind:KIND_EN[p.kind]||p.kind}));
     for(const q of this.queue){const e=q.ev;if(e.trapId!==id||!(e.photos||[]).length)continue;
       e.photos.forEach((p,i)=>out.push({local:q.id+'_'+i,src:p.thumb||p.dataUrl,full:p.dataUrl,date:e.date,time:e.time,kind:e.type,by:e.byName,pending:true}))}
     return out.sort((a,b)=>(b.date+(b.time||'')).localeCompare(a.date+(a.time||'')));
@@ -555,6 +580,7 @@ const App={
     this.form={};this.openSheet(id+' の写真',h+`<button class="btn" onclick="App.formPhoto('${esc(id)}')">写真を追加</button>`);this.fillThumbs($('#sheetBody'))},
   // 拡大表示（端末にある縮小版をすぐ出し、電波があれば元の写真に差し替え）
   async viewPhoto(key){let p=null;for(const t of this.traps())for(const x of this.trapPhotos(t.id))if(x.id===key||x.local===key)p=x;
+    if(!p)for(const r of this.records()||[]){for(const x of this.recPhotos(r))if(x.id===key||x.local===key)p=x}
     if(!p)return;const img=$('#viewerImg');$('#viewerCap').textContent=`${md(p.date)} ${p.time||''} ${TYPE_JA[p.kind]||p.kind||''}${p.by?'・'+p.by:''}`;
     $('#viewer').classList.add('open');
     if(p.local){img.src=p.full||p.src;return}
@@ -692,7 +718,141 @@ const App={
         <a class="pbtn sec" href="${gm}" target="_blank" rel="noopener">Googleマップで開く</a>`);
       mk.on('popupopen',e=>this.fillThumbs(e.popup.getElement()));
       this.trapMarkers[t.id]=mk}
+    this.drawNotes();
   },
+  // 下調べ・痕跡メモ（位置のあるもの）を📝で表示
+  showNotes:true,noteMarkers:{},
+  toggleNotes(){this.showNotes=!this.showNotes;$('#bNote').classList.toggle('on',this.showNotes);this.drawNotes()},
+  drawNotes(){if(!this.map)return;const g=this.layers.notes||(this.layers.notes=L.layerGroup().addTo(this.map));g.clearLayers();this.noteMarkers={};if(!this.showNotes)return;
+    for(const r of (this.records()||[]).filter(x=>x.kind==='note'&&x.lat&&x.lon)){
+      const mk=L.marker([+r.lat,+r.lon],{icon:L.divIcon({className:'',html:'<div class="note-pin">📝</div>',iconSize:[28,28],iconAnchor:[14,14]})}).addTo(g);
+      const np=this.recPhotos(r).length,gm=`https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lon}`;
+      mk.bindTooltip(esc((r.memo||'メモ').slice(0,12))+(np?' 📷':''),{direction:'right',offset:[14,0],className:'trap-label'});
+      mk.bindPopup(`<b style="font-size:15px">📝 ${md(r.date)} ${esc(r.time||'')}</b>${r.by?'・'+esc(r.by):''}${r.pending?'・未送信':''}<br><b>${esc(r.mesh||'---')}</b> ${esc((r.city||'')+(r.oaza||''))}
+        ${r.memo?`<div style="margin-top:4px;white-space:pre-wrap">${esc(r.memo)}</div>`:''}${this.recStrip(r,3)}
+        <button class="pbtn" style="background:#7a5a2f" onclick="App.recMenu('${esc(r.id)}')">詳細・修正・削除</button>
+        <button class="pbtn" onclick="App.closeMap();App.setFromNote('${esc(r.id)}')">この場所で罠を設置</button>
+        <a class="pbtn sec" href="${gm}" target="_blank" rel="noopener">Googleマップで開く</a>`);
+      mk.on('popupopen',e=>this.fillThumbs(e.popup.getElement()));
+      this.noteMarkers[r.id]=mk}
+  },
+  openNoteOnMap(id){const r=(this.records()||[]).find(x=>x.id===id);if(!r||!r.lat)return;this.closeSheet();this.openMap();
+    setTimeout(()=>{if(!this.showNotes)this.toggleNotes();this.map.setView([+r.lat,+r.lon],17);this.noteMarkers[id]?.openPopup()},120)},
+  setFromNote(id){const r=(this.records()||[]).find(x=>x.id===id);if(!r)return;
+    this.formSet({lat:r.lat,lon:r.lon,mesh:r.mesh||meshOf(+r.lat,+r.lon),city:r.city,oaza:r.oaza,date:r.date,memo:r.memo?'（下調べ）'+r.memo:''})},
+
+  // ---------- 記録の一覧・修正・削除 ----------
+  // サーバーの記録 ＋ 未送信の記録 ＋ 未送信の修正・削除 を重ねた一覧（新しい順）。古いサーバーなら null
+  records(){
+    if(!this.state||!Array.isArray(this.state.recs))return null;
+    let list=this.state.recs.map(r=>({...r,photos:[...(r.photos||[])]}));
+    const KINDS=['set','check','catch','remove','note','photo'];
+    for(const q of this.queue){const e=q.ev;if(!KINDS.includes(e.type))continue;
+      list.push({id:e.id,date:e.date,time:e.time,by:e.byName,kind:e.type,trapId:e.trapId||'',gear:e.trapType||'',mesh:e.mesh||'',city:e.city||'',oaza:e.oaza||'',lat:e.lat,lon:e.lon,
+        checkResult:e.checkResult||'',species:e.species||'',male:+e.male||0,female:+e.female||0,unknown:+e.unknown||0,weight:e.weight||'',disposal:e.disposal||'',memo:e.memo||'',
+        photos:[],local:(e.photos||[]).map((p,i)=>({local:q.id+'_'+i,src:p.thumb||p.dataUrl,full:p.dataUrl})),pending:true,qid:q.id})}
+    for(const q of this.queue){const e=q.ev;
+      if(e.type==='recEdit'){const r=list.find(x=>x.id===e.target);if(!r)continue;const f={...(e.fields||{})};if(r.kind==='set'||r.kind==='remove')delete f.date;Object.assign(r,f);
+        if(e.removePhotos?.length)r.photos=r.photos.filter(p=>!e.removePhotos.includes(p));
+        (e.photos||[]).forEach((p,i)=>(r.local=r.local||[]).push({local:q.id+'_'+i,src:p.thumb||p.dataUrl,full:p.dataUrl}));r.edited=true}
+      if(e.type==='recDel'){const r=list.find(x=>x.id===e.target);if(!r)continue;
+        if(r.kind==='set'&&r.trapId)list=list.filter(x=>x.kind==='note'||x.trapId!==r.trapId||x.date<r.date);
+        list=list.filter(x=>x.id!==e.target)}}
+    return list.sort((a,b)=>(b.date+(b.time||'')).localeCompare(a.date+(a.time||'')));
+  },
+  // 修正で外した写真・削除した記録の写真（未送信の間も隠す）
+  gonePhotos(){const s=new Set();const recs=this.state?.recs||[];
+    for(const q of this.queue){const e=q.ev;
+      if(e.type==='recEdit')(e.removePhotos||[]).forEach(id=>s.add(id));
+      if(e.type==='recDel'){const r=recs.find(x=>x.id===e.target);if(r)(r.photos||[]).forEach(id=>s.add(id))}}
+    return s},
+  recPhotos(r){return [...(r.photos||[]).map(id=>({id,date:r.date,time:r.time,kind:r.kind,by:r.by})),...(r.local||[]).map(p=>({...p,date:r.date,time:r.time,kind:r.kind,by:r.by,pending:true}))]},
+  recStrip(r,max){const ps=this.recPhotos(r);if(!ps.length)return '';return `<div class="pstrip">${ps.slice(0,max).map(p=>this.imgTag(p)).join('')}</div>${ps.length>max?`<div class="mini">ほか${ps.length-max}枚</div>`:''}`},
+  recTitle(r){return `${TYPE_JA[r.kind]||r.kind}${r.trapId?' '+r.trapId:''}`},
+  recSummary(r){if(r.kind==='catch')return `${r.species||''} ♂${r.male||0} ♀${r.female||0}${+r.unknown?' 不明'+r.unknown:''}`;
+    if(r.kind==='check')return r.checkResult&&r.checkResult!=='異常なし'?r.checkResult:'';
+    return (r.memo||'').slice(0,24)},
+  recRow(r){const np=this.recPhotos(r).length;
+    return `<div class="log tap" onclick="App.recMenu('${esc(r.id)}')"><div class="t">${md(r.date)} ${esc(r.time||'')}</div><div>${r.pending?'<span class="tag pending">未送信</span>':''}${r.edited?'<span class="tag pending">修正中</span>':''}<b>${esc(this.recTitle(r))}</b> ${esc(this.recSummary(r))} ${np?`<span class="tag cam">📷${np}</span>`:''}<span class="small"> ${esc(r.mesh||'')}${r.by&&r.by!==this.me()?'・'+esc(r.by):''}</span></div><div class="go">›</div></div>`},
+  recList(kind){const all=this.records()||[];const list=kind?all.filter(r=>r.kind===kind):all;
+    const opts=[['','すべて'],['note','メモ'],['set','設置'],['check','見回り'],['catch','捕獲'],['remove','撤去'],['photo','写真追加']];
+    this.form={};this.openSheet('すべての記録',`<div class="chips">${opts.map(([k,l])=>`<button type="button" class="chip ${k===(kind||'')?'on':''}" onclick="App.recList('${k}')">${l}</button>`).join('')}</div>
+      <div class="card" style="margin-top:10px">${list.length?list.map(r=>this.recRow(r)).join(''):'<div class="empty">記録がありません</div>'}</div>
+      <div class="small">サーバーにある最近300件まで表示します。それより前の記録はPCのスプレッドシートで直してください。</div>`)},
+  recMenu(id){const r=(this.records()||[]).find(x=>x.id===id);if(!r){toast('この記録は見つかりません（削除済みかもしれません）');return}
+    this.map?.closePopup();
+    const d=[];
+    if(r.kind==='catch')d.push(`鳥獣 ${esc(r.species||'-')}・♂${r.male||0} ♀${r.female||0}${+r.unknown?'・不明'+r.unknown:''}`,`推定体重 ${esc(r.weight||'-')}kg・処理 ${esc(r.disposal||'-')}`);
+    if(r.kind==='check')d.push(`結果 ${esc(r.checkResult||'-')}`);
+    const trap=r.trapId&&this.traps().find(t=>t.id===r.trapId);
+    this.form={};this.openSheet(this.recTitle(r),`<div class="card">
+      <div>${r.pending?'<span class="tag pending">未送信</span> ':''}${r.edited?'<span class="tag pending">修正（未送信）</span> ':''}<b>${md(r.date)} ${esc(r.time||'')}</b>・${esc(r.by||'')}</div>
+      <div style="font-size:18px;font-weight:800;margin-top:4px">${esc(r.mesh||'---')} <span style="font-size:14px;font-weight:600">${esc((r.city||'')+(r.oaza||''))}</span></div>
+      ${d.map(x=>`<div class="small">${x}</div>`).join('')}
+      ${r.memo?`<div style="margin-top:6px;white-space:pre-wrap">${esc(r.memo)}</div>`:''}
+      ${this.recStrip(r,8)}</div>
+      <button class="btn" onclick="App.formRec('${esc(id)}')">この記録を修正する（文字・写真）</button>
+      ${r.kind==='set'&&trap?`<button class="btn sec" onclick="App.formEdit('${esc(r.trapId)}')">罠の種類・設置者・設置日を直す</button>`:''}
+      ${r.kind==='remove'&&trap?`<button class="btn sec" onclick="App.formEdit('${esc(r.trapId)}')">撤去日を直す</button>`:''}
+      ${trap?`<button class="btn sec" onclick="App.trapMenu('${esc(r.trapId)}')">罠 ${esc(r.trapId)} を開く</button>`:''}
+      ${r.kind==='note'&&r.lat&&r.lon?`<div class="row"><button class="btn sec" onclick="App.openNoteOnMap('${esc(id)}')">地図で見る</button><button class="btn sec" onclick="App.closeSheet();App.setFromNote('${esc(id)}')">この場所で罠を設置</button></div>`:''}
+      ${this.recPhotos(r).length?`<button class="btn sec" onclick="App.saveRecPhotos('${esc(id)}')">写真をスマホに保存（${this.recPhotos(r).length}枚）</button>`:''}
+      <button class="btn danger" style="margin-top:22px" onclick="App.delRec('${esc(id)}')">この記録を削除する</button>`);this.fillThumbs($('#sheetBody'))},
+  formRec(id){const r=(this.records()||[]).find(x=>x.id===id);if(!r)return;
+    this.form={date:r.date,time:r.time,memo:r.memo||'',checkResult:r.checkResult||'異常なし',species:r.species||'',male:r.male||0,female:r.female||0,unknown:r.unknown||0,weight:r.weight||'',disposal:r.disposal||'',rm:[],rmLocal:[],photos:[],
+      render:()=>{const f=this.form,fixedDate=r.kind==='set'||r.kind==='remove';
+      const cur=this.recPhotos(r);
+      this.openSheet(this.recTitle(r)+' を修正',`
+      ${fixedDate?`<div class="small">${r.kind==='set'?'設置日':'撤去日'}・種類・設置者は「罠の情報を直す」で直します（${md(r.date)}）。</div>`:`<div class="row"><div><label class="f">日付</label><input type="date" data-f="date" value="${esc(f.date||'')}"></div><div><label class="f">時刻</label><input type="time" data-f="time" value="${esc(f.time||'')}"></div></div>`}
+      ${r.kind==='check'?`<label class="f">見回り結果</label>${this.chipHtml('checkResult',CHECK_RESULTS,f.checkResult)}`:''}
+      ${r.kind==='catch'?`<label class="f">鳥獣の種類</label>${this.chipHtml('species',SPECIES,f.species)}
+        <div class="row">${['male','female','unknown'].map((k,i)=>`<div><label class="f">${['オス','メス','不明'][i]}</label><div class="stepper"><button type="button" onclick="App.step('${k}',-1)">−</button><span>${+f[k]||0}</span><button type="button" onclick="App.step('${k}',1)">＋</button></div></div>`).join('')}</div>
+        <label class="f">推定体重（kg）</label><input type="number" inputmode="decimal" data-f="weight" value="${esc(f.weight||'')}">
+        <label class="f">処理方法</label>${this.chipHtml('disposal',DISPOSAL,f.disposal)}`:''}
+      <label class="f">${r.kind==='set'?'目印・設置場所メモ':'メモ'}</label><textarea data-f="memo">${esc(f.memo||'')}</textarea>
+      ${cur.length?`<label class="f">今の写真（✕で外す・もう一度押すと戻す）</label><div class="photos">${cur.map(p=>{const key=p.id||p.local,on=p.id?f.rm.includes(p.id):f.rmLocal.includes(p.local);
+        return `<span class="eph ${on?'rm':''}">${this.imgTag(p)}<button type="button" class="x" onclick="App.toggleRm('${esc(key)}',${p.id?1:0})">✕</button></span>`}).join('')}</div>`:''}
+      ${this.photoBlock('写真を差し替えるときは、古い写真を✕で外して、新しい写真を撮ってください。')}
+      <label class="f">直した理由（任意）</label><input type="text" data-f="reason" value="${esc(f.reason||'')}" placeholder="例：頭数の入力間違い">
+      <button class="btn" onclick="App.saveRec('${esc(id)}')">この内容で保存</button>`);this.fillThumbs($('#sheetBody'))}};this.renderForm()},
+  toggleRm(key,server){this.readInputs();const a=server?this.form.rm:this.form.rmLocal;const i=a.indexOf(key);if(i>=0)a.splice(i,1);else a.push(key);this.renderForm()},
+  async saveRec(id){this.readInputs();const f=this.form;const r=(this.records()||[]).find(x=>x.id===id);if(!r)return;
+    const keys=['memo'];if(r.kind!=='set'&&r.kind!=='remove')keys.push('date','time');
+    if(r.kind==='check')keys.push('checkResult');if(r.kind==='catch')keys.push('species','male','female','unknown','weight','disposal');
+    const fields={};for(const k of keys){const nv=['male','female','unknown'].includes(k)?(+f[k]||0):String(f[k]??'');const ov=['male','female','unknown'].includes(k)?(+r[k]||0):String(r[k]??'');if(nv!==ov)fields[k]=nv}
+    if(fields.date===''||(fields.date&&!/^\d{4}-\d{2}-\d{2}$/.test(fields.date)))return toast('日付を入れてください');
+    const newP=f.photos||[];
+    if(!Object.keys(fields).length&&!f.rm.length&&!f.rmLocal.length&&!newP.length)return toast('変更がありません');
+    // 未送信の記録は、送る前の中身を直接直す
+    if(r.pending&&r.qid){if(this.syncing)return toast('送信中です。少し待ってからもう一度押してください',4000);
+      const q=this.queue.find(x=>x.id===r.qid);if(!q)return toast('この記録は送信済みになりました。もう一度開き直してください');
+      Object.assign(q.ev,fields);const keep=(q.ev.photos||[]).filter((p,i)=>!f.rmLocal.includes(q.id+'_'+i));q.ev.photos=[...keep,...newP];
+      await DB.put(q);this.closeSheet();this.render();toast('修正しました（まだ未送信です）');return}
+    if(f.rmLocal.length)toast('未送信の修正の写真は外せません。送信後にもう一度直してください',4000);
+    const ev={id:uid(),type:'recEdit',date:today(),time:nowTime(),target:id,kind:r.kind,trapId:r.trapId||'',fields,removePhotos:[...f.rm],photos:newP,reason:f.reason||'',byName:this.me(),lat:'',lon:''};
+    this.closeSheet();toast('記録を修正しました'+(newP.length?'（写真は順に送信します）':''));
+    try{await this.enqueue(ev)}catch(e){toast('保存できませんでした：'+(e.message||e),6000)}
+    if(this.map&&$('#mapView').classList.contains('open'))this.drawTraps()},
+  async delRec(id){const r=(this.records()||[]).find(x=>x.id===id);if(!r)return;
+    const what=`${md(r.date)} ${this.recTitle(r)}${r.kind==='note'&&r.memo?'「'+r.memo.slice(0,20)+'」':''}`;
+    if(r.kind==='set'){const n=(this.records()||[]).filter(x=>x.trapId===r.trapId&&x.id!==id&&x.kind!=='note'&&x.date>=r.date).length;
+      if(!confirm(`罠 ${r.trapId} の設置記録を削除します。\n罠そのものと、この罠の見回り・捕獲・撤去・写真の記録${n?n+'件':''}もまとめて消えます。\n\n（テストや間違いで登録した罠のときだけ使ってください。罠を外したときは「撤去」です）`))return;
+      if(!confirm(`本当に罠 ${r.trapId} を削除しますか？`))return}
+    else{if(!confirm(`この記録を削除しますか？\n${what}${r.kind==='catch'?'\n\n捕獲の記録を消すと、提出書類の頭数からも消えます。':''}`))return}
+    if(r.pending&&r.qid){if(this.syncing)return toast('送信中です。少し待ってからもう一度押してください',4000);
+      const drop=new Set([r.qid]);if(r.kind==='set')for(const q of this.queue)if(q.ev.trapId===r.trapId&&q.seq>(this.queue.find(x=>x.id===r.qid)?.seq||0))drop.add(q.id);
+      for(const k of drop)await DB.del(k);this.queue=this.queue.filter(q=>!drop.has(q.id));this.closeSheet();this.render();toast('送る前の記録を取り消しました');return}
+    const ev={id:uid(),type:'recDel',date:today(),time:nowTime(),target:id,kind:r.kind,trapId:r.trapId||'',reason:'',byName:this.me(),lat:'',lon:''};
+    this.closeSheet();toast('記録を削除しました（管理者はスプレッドシートの「削除済み記録」から戻せます）',4500);
+    try{await this.enqueue(ev)}catch(e){toast('保存できませんでした：'+(e.message||e),6000)}
+    if(this.map&&$('#mapView').classList.contains('open'))this.drawTraps()},
+  // 写真をまとめてスマホに保存（ボタンを押したときなので保存されやすい）
+  async saveRecPhotos(id){const r=(this.records()||[]).find(x=>x.id===id);if(!r)return;const ps=this.recPhotos(r);let n=0;
+    for(const p of ps){let d=p.local?(p.full||p.src):(this.fullMem?.[p.id]);
+      if(!d&&p.id&&navigator.onLine&&this.cfg.api){try{const x=await this.post({action:'photo',id:p.id});d=x.images?.[p.id];if(d)(this.fullMem=this.fullMem||{})[p.id]=d}catch(e){}}
+      if(!d&&p.id)d=this.thumbMem[p.id]||await DB.thumbGet(p.id);
+      if(d){this.download(d,`wana_${(r.date||'').replace(/-/g,'')}_${TYPE_JA[r.kind]||r.kind}_${++n}.jpg`);await new Promise(res=>setTimeout(res,400))}}
+    toast(n?`${n}枚をスマホ（ダウンロード）に保存しました。保存されないときは⚙の説明を見てください`:'保存できる写真がありません',4500)},
   // 位置補正：地図を動かして十字に合わせる
   startFix(id){const t=this.traps().find(x=>x.id===id);if(!t)return;this.map.closePopup();
     this.fixing={id,orig:t.lat&&t.lon?[+t.lat,+t.lon]:null};
@@ -770,6 +930,7 @@ const App={
     <label class="f">トークン</label><input type="text" id="cfgToken" value="${esc(this.cfg.token)}">
     <button class="btn" onclick="App.saveSettings()">保存して接続</button>
     <label class="checkrow" style="margin-top:14px"><input type="checkbox" id="cfgSavePhotos" ${this.savePhotosOn()?'checked':''} onchange="LS.set('savePhotos',this.checked);toast(this.checked?'撮った写真をスマホにも保存します':'スマホへの保存をやめました')"><span>アプリで撮った写真をスマホにも保存する（「ダウンロード」フォルダ）</span></label>
+    <div class="hint">2枚目から保存されないときは、Chromeが「複数のファイルのダウンロード」を止めています。Chrome右上の︙ → 設定 → サイトの設定 → 自動ダウンロード で、このアプリのサイトを「許可」にしてください。画面の下に「このサイトに複数のファイルのダウンロードを許可しますか？」と出たときは「許可」を押します。</div>
     <div class="card" style="margin-top:16px"><div class="small">利用者：${esc(this.me()||'未接続')}・未送信：${this.queue.length}件<br>アプリ v${APP_VER}・サーバー ${this.state?.serverVer?'v'+esc(this.state.serverVer):'（確認できず）'}${this.lastErr?`<br>最後のエラー：${esc(this.lastErr)}（${esc({offline:'圏外',net:'電波・通信',auth:'招待リンク',server:'サーバー'}[this.errKind]||'')}）`:''}</div></div>
     <button class="btn sec" onclick="App.openManual()">📖 使い方マニュアル${this.state?.manual?.ver?' v'+esc(this.state.manual.ver):''}（PDF）</button>
     <button class="btn sec" onclick="App.exportQueue()">未送信データを書き出す（予備）</button>
