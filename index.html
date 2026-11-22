@@ -259,10 +259,10 @@ const App={
     const q=new URLSearchParams(location.search);
     if(q.get('api')&&q.get('token')){this.cfg={api:q.get('api'),token:q.get('token')};LS.set('cfg',this.cfg);history.replaceState(null,'',location.pathname);toast('設定を読み込みました')}
     {const mv=LS.get('state',null)?.manual?.ver;$('#splashVer').textContent='アプリ v'+APP_VER+(mv?'　マニュアル v'+mv:'')}
-    setTimeout(()=>$('#splash').classList.add('hide'),1300);
+    setTimeout(()=>$('#splash').classList.add('hide'),2300);
     this.queue=await DB.all();
     this.render();
-    setTimeout(()=>this.checkUpdateNotice(),1400);
+    setTimeout(()=>this.checkUpdateNotice(),2400);
     if(!this.cfg.api||!this.cfg.token){this.openSettings();}
     this.locate();
     this.sync();
