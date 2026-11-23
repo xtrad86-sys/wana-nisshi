@@ -1,5 +1,5 @@
 // わな猟日誌 Service Worker（オフラインで画面を開けるようにする）
-const CACHE='wanalog-v3.10.1';
+const CACHE='wanalog-v3.11';
 const SHELL=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./leaflet.js','./leaflet.css','./top.webp','./logo-s.webp'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE&&k!=='wanalog-tiles').map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});

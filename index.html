@@ -206,10 +206,11 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad=n=>String(n).padStart(2,'0');
 const distM=(a,b,c,d)=>{const R=6371000,r=Math.PI/180,x=(d-b)*r*Math.cos((a+c)/2*r),y=(c-a)*r;return Math.sqrt(x*x+y*y)*R};
-const APP_VER='3.10.1';
+const APP_VER='3.11';
 // マニュアル（PDF）はGoogleドライブに置き、サーバー経由で招待リンクを持つ人だけが開ける
 // 更新のお知らせ（新しい版を上に足していく）
 const CHANGELOG={
+  '3.11':['見回り：最初はチェックなし（罠から開いたときはその罠だけ）。天候などを変えてもチェックや入力が消えないように','⚙に「全記録をスマホに保存（CSV）」を追加（オフラインの控え）'],
   '3.10.1':['SOSボタンをホーム画面のいちばん下（マニュアルの下）の大きいボタンに移動。右上には名前が見えるように戻しました'],
   '3.10':['「SOS」ボタンを追加。現在地入りのSMSを登録した相手に送れる（相手は⚙で各自が登録）','SOS画面に、119・110への電話と、圏外のときの連絡方法の案内'],
   '3.9.2':['設置・捕獲・撤去・メモでも、その場の天候・気温を自動で記録（入力は不要）'],
@@ -416,9 +417,13 @@ const App={
   // ---------- シート（入力画面） ----------
   openSheet(title,html){$('#sheetTitle').textContent=title;$('#sheetBody').innerHTML=html;$('#sheet').classList.add('open');$('#sheetBg').classList.add('open');$('#sheet').scrollTop=0},
   closeSheet(){$('#sheet').classList.remove('open');$('#sheetBg').classList.remove('open');this.form={}},
-  renderForm(){if(this.form.render)this.form.render()},
+  // 画面を描き直す前に、いま画面に入っている値（文字・チェック・結果）を読み取っておく（天候を押しても選択が戻らないように）
+  readAll(){if(!this.form._rendered)return;this.readInputs();const b=$('#sheetBody');
+    if(this.form.sel)b.querySelectorAll('[data-sel]').forEach(el=>this.form.sel[el.dataset.sel]=el.checked);
+    if(this.form.res)b.querySelectorAll('[data-res]').forEach(el=>this.form.res[el.dataset.res]=el.value)},
+  renderForm(){if(!this.form.render)return;this.readAll();this.form.render();this.form._rendered=true},
   chipHtml(name,opts,val){return `<div class="chips">${opts.map(o=>`<button type="button" class="chip ${o===val?'on':''}" onclick="App.setF('${name}','${esc(o)}')">${esc(o)}</button>`).join('')}</div>`},
-  setF(k,v){this.form[k]=this.form[k]===v&&this.form.toggle?.includes(k)?'':v;this.renderForm()},
+  setF(k,v){this.readAll();this.form[k]=this.form[k]===v&&this.form.toggle?.includes(k)?'':v;if(this.form.render){this.form.render();this.form._rendered=true}},
   readInputs(){$('#sheetBody').querySelectorAll('[data-f]').forEach(el=>{this.form[el.dataset.f]=el.type==='checkbox'?el.checked:el.value})},
   locBlock(){
     const l=this.loc,p=this.placeNow(),f=this.form;
@@ -479,7 +484,7 @@ const App={
     if(!traps.length)return toast('稼働中の罠がありません');
     this.form={useLoc:true,sel:{},res:{},render:()=>{const f=this.form;
       this.openSheet('見回り',`
-      <div class="small">チェックした罠を「見回り済み」にします。結果を変えたい罠だけ選び直してください。</div>
+      <div class="small">見回りした罠にチェックを入れてください。結果は罠ごとに選べます（天候などを変えてもチェックは消えません）。</div>
       <div class="row" style="margin:10px 0"><button class="btn sec" style="margin:0" onclick="App.selAll(true)">自分の罠を全選択</button><button class="btn sec" style="margin:0" onclick="App.selAll(false)">全解除</button></div>
       ${traps.map(t=>`<div class="checkrow"><input type="checkbox" data-sel="${esc(t.id)}" ${f.sel[t.id]?'checked':''}><div class="nm">${esc(t.id)}</div>
         <select data-res="${esc(t.id)}">${CHECK_RESULTS.map(r=>`<option ${f.res[t.id]===r?'selected':''}>${r}</option>`).join('')}</select></div>`).join('')}
@@ -487,10 +492,10 @@ const App={
       <label class="f">メモ</label><textarea data-f="memo" placeholder="例：新しい足跡、餌の食べ跡">${esc(f.memo||'')}</textarea>
       <div class="hint">獲れていたら「捕獲」から記録してください（見回りも同時に記録されます）。</div>
       <button class="btn" onclick="App.saveCheck()">見回りを記録</button>`)}};
-    traps.forEach(t=>{this.form.sel[t.id]=preId?t.id===preId:t.owner===this.me();this.form.res[t.id]='異常なし'});
+    traps.forEach(t=>{this.form.sel[t.id]=!!preId&&t.id===preId;this.form.res[t.id]='異常なし'});
     this.renderForm();
   },
-  selAll(on){this.readChecks();this.activeTraps().forEach(t=>this.form.sel[t.id]=on?t.owner===this.me():false);this.renderForm()},
+  selAll(on){this.readAll();this.activeTraps().forEach(t=>this.form.sel[t.id]=on?t.owner===this.me():false);this.form.render()},
   readChecks(){this.readInputs();$('#sheetBody').querySelectorAll('[data-sel]').forEach(el=>this.form.sel[el.dataset.sel]=el.checked);$('#sheetBody').querySelectorAll('[data-res]').forEach(el=>this.form.res[el.dataset.res]=el.value)},
   async saveCheck(){this.readChecks();const f=this.form;const ids=Object.keys(f.sel).filter(k=>f.sel[k]);
     if(!ids.length)return toast('罠を選んでください');
@@ -959,6 +964,8 @@ const App={
     <div class="row"><button class="btn sec" type="button" onclick="App.addSosContact()">＋ 連絡先を追加</button><button class="btn" type="button" onclick="App.saveSosContacts()">連絡先を保存</button></div>
     <div class="card" style="margin-top:16px"><div class="small">利用者：${esc(this.me()||'未接続')}・未送信：${this.queue.length}件<br>アプリ v${APP_VER}・サーバー ${this.state?.serverVer?'v'+esc(this.state.serverVer):'（確認できず）'}${this.lastErr?`<br>最後のエラー：${esc(this.lastErr)}（${esc({offline:'圏外',net:'電波・通信',auth:'招待リンク',server:'サーバー'}[this.errKind]||'')}）`:''}</div></div>
     <button class="btn sec" onclick="App.openManual()">📖 使い方マニュアル${this.state?.manual?.ver?' v'+esc(this.state.manual.ver):''}（PDF）</button>
+    <button class="btn sec" onclick="App.exportAll()">💾 全記録をスマホに保存（CSV・オフライン用）</button>
+    <div class="small">記録と罠台帳を、表計算ソフトで開けるファイル（CSV）にしてスマホの「ダウンロード」に保存します。サーバーやネットが使えないときの控えです。月に1回と、猟期の終わりに。</div>
     <button class="btn sec" onclick="App.exportQueue()">未送信データを書き出す（予備）</button>
     <p class="small">位置図番号は「京都府鳥獣保護区等位置図（令和8年度）」の3桁番号をGPSから計算しています。区画の境界付近では、紙の位置図でも確認してください。</p>`)},
   // ---------- SOS ----------
@@ -1008,6 +1015,18 @@ const App={
     try{const l=this.loc;await this.enqueue({...this.baseEvent('note'),memo:'🆘 SOSを発信（'+cs.map(c=>c.name||c.tel).join('・')+'へSMS）'+(this.form.sosWhat?'：'+this.form.sosWhat:''),photos:[]})}catch(e){}
   },
   async saveSettings(){this.cfg={api:$('#cfgApi').value.trim(),token:$('#cfgToken').value.trim()};LS.set('cfg',this.cfg);this.closeSheet();await this.sync(true)},
+  // 全記録・罠台帳をCSVで保存（Excelで文字化けしないよう先頭にBOM）
+  exportAll(){const recs=this.records();if(!recs&&!this.traps().length)return toast('まだ記録がありません。電波のある所で一度開いてください',4000);
+    const q=v=>{v=v==null?'':String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+    const csv=rows=>'\ufeff'+rows.map(r=>r.map(q).join(',')).join('\r\n');
+    const d=today().replace(/-/g,'');
+    const R=[['記録ID','日付','時刻','記録者','種別','罠ID','猟具','位置図番号','市町村','大字','緯度','経度','見回り結果','鳥獣','オス','メス','性別不明','推定体重kg','処理方法','メモ','写真枚数','状態']];
+    for(const r of recs||this.history.map(e=>({...e,kind:e.type,by:e.byName}))){R.push([r.id,r.date,r.time,r.by,TYPE_JA[r.kind]||r.kind,r.trapId,r.gear||r.trapType||'',r.mesh,r.city,r.oaza,r.lat,r.lon,r.checkResult,r.species,r.male,r.female,r.unknown,r.weight,r.disposal,r.memo,(r.photos||[]).length+(r.local||[]).length||r.photoCount||0,r.pending?'未送信':''])}
+    const T=[['罠ID','種類','設置者','状態','設置日','撤去日','位置図番号','市町村','大字','緯度','経度','目印メモ','最終見回り日','累計捕獲数']];
+    for(const t of this.traps())T.push([t.id,t.type,t.owner,t.status,t.setDate,t.removeDate,t.mesh,t.city,t.oaza,t.lat,t.lon,t.memo,t.lastCheck,t.catches]);
+    this.download(new Blob([csv(R)],{type:'text/csv'}),`狩猟日誌_記録_${d}.csv`);
+    setTimeout(()=>this.download(new Blob([csv(T)],{type:'text/csv'}),`狩猟日誌_罠台帳_${d}.csv`),600);
+    toast(`記録${R.length-1}件・罠${T.length-1}基をスマホの「ダウンロード」に保存しました`+(this.state?.recs?'':'（サーバーが古いため一部のみ）'),5000)},
   async exportQueue(){const q=await DB.all();const blob=new Blob([JSON.stringify(q.map(x=>x.ev),null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='wanalog_unsent_'+today()+'.json';a.click()}
 };
 
